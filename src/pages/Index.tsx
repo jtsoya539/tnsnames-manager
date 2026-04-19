@@ -24,95 +24,90 @@ interface TnsEntry {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-// Parse tnsnames.ora content
+// Parse tnsnames.ora content - improved version
 function parseTnsnames(content: string): TnsEntry[] {
   const entries: TnsEntry[] = [];
+  
+  // Normalize content: remove comments and normalize whitespace
   const lines = content.split('\n');
-  let currentEntry: Partial<TnsEntry> | null = null;
-  let braceLevel = 0;
-  let inEntry = false;
-  let currentAlias = '';
-
+  let normalizedLines: string[] = [];
+  
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    let line = lines[i];
+    // Remove comments
+    const commentIndex = line.indexOf('#');
+    if (commentIndex >= 0) {
+      line = line.substring(0, commentIndex);
+    }
+    line = line.trim();
+    if (line) {
+      normalizedLines.push(line);
+    }
+  }
+  
+  const normalizedContent = normalizedLines.join(' ');
+  
+  // Match alias = (DESCRIPTION ...)
+  const entryRegex = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\(/gi;
+  let match;
+  
+  while ((match = entryRegex.exec(normalizedContent)) !== null) {
+    const alias = match[1];
+    const startPos = match.index + match[0].length;
     
-    // Skip empty lines and comments
-    if (!line || line.startsWith('#')) continue;
-
-    // Check for alias (ends with =)
-    if (line.endsWith('=') && !inEntry) {
-      if (currentEntry && currentEntry.alias) {
-        entries.push(currentEntry as TnsEntry);
-      }
-      currentAlias = line.replace('=', '').trim();
-      currentEntry = {
-        id: generateId(),
-        alias: currentAlias,
-        host: '',
-        port: '1521',
-        serviceName: '',
-        protocol: 'TCP',
-        description: currentAlias
-      };
-      inEntry = true;
-      continue;
+    // Find matching closing parenthesis
+    let braceLevel = 1;
+    let endPos = startPos;
+    
+    while (endPos < normalizedContent.length && braceLevel > 0) {
+      if (normalizedContent[endPos] === '(') braceLevel++;
+      else if (normalizedContent[endPos] === ')') braceLevel--;
+      endPos++;
     }
-
-    // Parse key-value pairs inside entry
-    if (inEntry && line.includes('=')) {
-      const equalsIndex = line.indexOf('=');
-      const key = line.substring(0, equalsIndex).trim().toUpperCase();
-      let value = line.substring(equalsIndex + 1).trim();
-
-      // Handle parentheses continuation
-      if (value === '(') {
-        braceLevel = 1;
-        let j = i + 1;
-        value = '';
-        while (j < lines.length && braceLevel > 0) {
-          const contLine = lines[j].trim();
-          if (contLine === '(') braceLevel++;
-          if (contLine === ')') braceLevel--;
-          if (braceLevel > 0 && contLine !== '(') {
-            value += contLine + ' ';
-          }
-          j++;
-        }
-        i = j - 1;
-      }
-
-      // Extract values
-      if (currentEntry) {
-        if (key === 'HOST') {
-          currentEntry.host = value;
-        } else if (key === 'PORT') {
-          currentEntry.port = value;
-        } else if (key === 'SERVICE_NAME') {
-          currentEntry.serviceName = value;
-        } else if (key === 'SID') {
-          currentEntry.serviceName = value;
-        } else if (key === 'PROTOCOL') {
-          currentEntry.protocol = value;
-        } else if (key === 'DESCRIPTION') {
-          currentEntry.description = value || currentAlias;
-        }
-      }
+    
+    const entryContent = normalizedContent.substring(startPos, endPos - 1);
+    
+    // Extract values from entry content
+    const entry: Partial<TnsEntry> = {
+      id: generateId(),
+      alias: alias,
+      host: '',
+      port: '1521',
+      serviceName: '',
+      protocol: 'TCP',
+      description: alias
+    };
+    
+    // Extract HOST
+    const hostMatch = /(?:ADDRESS|ADDRESS_LIST)[^)]*\bHOST\s*=\s*([A-Za-z0-9._-]+)/i.exec(entryContent);
+    if (hostMatch) {
+      entry.host = hostMatch[1];
     }
-
-    // End of entry
-    if (inEntry && (line === ')' || line === ') ')) {
-      if (currentEntry && currentEntry.alias) {
-        entries.push(currentEntry as TnsEntry);
-      }
-      currentEntry = null;
-      inEntry = false;
+    
+    // Extract PORT
+    const portMatch = /(?:ADDRESS|ADDRESS_LIST)[^)]*\bPORT\s*=\s*(\d+)/i.exec(entryContent);
+    if (portMatch) {
+      entry.port = portMatch[1];
+    }
+    
+    // Extract PROTOCOL
+    const protocolMatch = /(?:ADDRESS|ADDRESS_LIST)[^)]*\bPROTOCOL\s*=\s*([A-Za-z]+)/i.exec(entryContent);
+    if (protocolMatch) {
+      entry.protocol = protocolMatch[1].toUpperCase();
+    }
+    
+    // Extract SERVICE_NAME or SID
+    const serviceNameMatch = /(?:CONNECT_DATA[^)]*)\b(?:SERVICE_NAME|SID)\s*=\s*([A-Za-z0-9._-]+)/i.exec(entryContent);
+    if (serviceNameMatch) {
+      entry.serviceName = serviceNameMatch[1];
+    }
+    
+    // Only add if we have at least host and serviceName
+    if (entry.host && entry.serviceName) {
+      entries.push(entry as TnsEntry);
     }
   }
-
-  if (currentEntry && currentEntry.alias) {
-    entries.push(currentEntry as TnsEntry);
-  }
-
+  
   return entries;
 }
 
@@ -751,6 +746,7 @@ const EntryFormDialog = ({ title, entry, onSubmit, onCancel }: EntryFormDialogPr
           >
             <option value="TCP">TCP</option>
             <option value="IPC">IPC</option>
+            <option value="TCPS">TCPS</option>
           </select>
         </div>
 
