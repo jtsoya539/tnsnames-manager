@@ -24,34 +24,45 @@ interface TnsEntry {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-// Parse tnsnames.ora content - improved version
+// Parse tnsnames.ora content - robust version
 function parseTnsnames(content: string): TnsEntry[] {
   const entries: TnsEntry[] = [];
   
-  // Normalize content: remove comments and normalize whitespace
+  // Remove comments
   const lines = content.split('\n');
-  let normalizedLines: string[] = [];
+  let cleanLines: string[] = [];
   
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
-    // Remove comments
-    const commentIndex = line.indexOf('#');
-    if (commentIndex >= 0) {
-      line = line.substring(0, commentIndex);
+    // Remove comments (but not inside strings)
+    let inString = false;
+    let result = '';
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      if (char === '"' && (j === 0 || line[j-1] !== '\\')) {
+        inString = !inString;
+        result += char;
+      } else if (char === '#' && !inString) {
+        break; // Rest of line is comment
+      } else {
+        result += char;
+      }
     }
-    line = line.trim();
+    line = result.trim();
     if (line) {
-      normalizedLines.push(line);
+      cleanLines.push(line);
     }
   }
   
-  const normalizedContent = normalizedLines.join(' ');
+  // Join lines, preserving structure
+  let cleanContent = cleanLines.join(' ');
   
-  // Match alias = (DESCRIPTION ...)
-  const entryRegex = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\(/gi;
+  // Find all alias = ( entries
+  // Match alias followed by = and opening parenthesis
+  const aliasRegex = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\(/g;
   let match;
   
-  while ((match = entryRegex.exec(normalizedContent)) !== null) {
+  while ((match = aliasRegex.exec(cleanContent)) !== null) {
     const alias = match[1];
     const startPos = match.index + match[0].length;
     
@@ -59,13 +70,13 @@ function parseTnsnames(content: string): TnsEntry[] {
     let braceLevel = 1;
     let endPos = startPos;
     
-    while (endPos < normalizedContent.length && braceLevel > 0) {
-      if (normalizedContent[endPos] === '(') braceLevel++;
-      else if (normalizedContent[endPos] === ')') braceLevel--;
+    while (endPos < cleanContent.length && braceLevel > 0) {
+      if (cleanContent[endPos] === '(') braceLevel++;
+      else if (cleanContent[endPos] === ')') braceLevel--;
       endPos++;
     }
     
-    const entryContent = normalizedContent.substring(startPos, endPos - 1);
+    const entryContent = cleanContent.substring(startPos, endPos - 1);
     
     // Extract values from entry content
     const entry: Partial<TnsEntry> = {
@@ -78,29 +89,32 @@ function parseTnsnames(content: string): TnsEntry[] {
       description: alias
     };
     
-    // Extract HOST
-    const hostMatch = /(?:ADDRESS|ADDRESS_LIST)[^)]*\bHOST\s*=\s*([A-Za-z0-9._-]+)/i.exec(entryContent);
-    if (hostMatch) {
-      entry.host = hostMatch[1];
+    // Helper function to extract value by key, handling nested parentheses
+    function extractValue(key: string): string | null {
+      const keyUpper = key.toUpperCase();
+      const keyLower = key.toLowerCase();
+      
+      // Try both cases
+      const regex = new RegExp(`\\b${keyUpper}\\s*=\\s*([A-Za-z0-9._-]+)`, 'i');
+      const match = entryContent.match(regex);
+      return match ? match[1] : null;
     }
+    
+    // Extract HOST - look for HOST = value
+    const hostValue = extractValue('HOST');
+    if (hostValue) entry.host = hostValue;
     
     // Extract PORT
-    const portMatch = /(?:ADDRESS|ADDRESS_LIST)[^)]*\bPORT\s*=\s*(\d+)/i.exec(entryContent);
-    if (portMatch) {
-      entry.port = portMatch[1];
-    }
+    const portValue = extractValue('PORT');
+    if (portValue) entry.port = portValue;
     
     // Extract PROTOCOL
-    const protocolMatch = /(?:ADDRESS|ADDRESS_LIST)[^)]*\bPROTOCOL\s*=\s*([A-Za-z]+)/i.exec(entryContent);
-    if (protocolMatch) {
-      entry.protocol = protocolMatch[1].toUpperCase();
-    }
+    const protocolValue = extractValue('PROTOCOL');
+    if (protocolValue) entry.protocol = protocolValue.toUpperCase();
     
     // Extract SERVICE_NAME or SID
-    const serviceNameMatch = /(?:CONNECT_DATA[^)]*)\b(?:SERVICE_NAME|SID)\s*=\s*([A-Za-z0-9._-]+)/i.exec(entryContent);
-    if (serviceNameMatch) {
-      entry.serviceName = serviceNameMatch[1];
-    }
+    const serviceNameValue = extractValue('SERVICE_NAME') || extractValue('SID');
+    if (serviceNameValue) entry.serviceName = serviceNameValue;
     
     // Only add if we have at least host and serviceName
     if (entry.host && entry.serviceName) {
