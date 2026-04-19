@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, FileDown, FileUp, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -634,6 +634,20 @@ const EntryFormDialog = ({ title, entry, onSubmit, onCancel }: EntryFormDialogPr
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Update form data when entry prop changes
+  useEffect(() => {
+    if (entry) {
+      setFormData({
+        alias: entry.alias || "",
+        host: entry.host || "",
+        port: entry.port || "1521",
+        serviceName: entry.serviceName || "",
+        protocol: entry.protocol || "TCP",
+        description: entry.description || "",
+      });
+    }
+  }, [entry]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
