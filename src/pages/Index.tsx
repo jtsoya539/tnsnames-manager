@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showSuccess, showError } from "@/utils/toast";
 
+const APP_VERSION = "1.0.0";
+
 interface TnsEntry {
   id: string;
   alias: string;
@@ -92,7 +94,6 @@ function parseTnsnames(content: string): TnsEntry[] {
     // Helper function to extract value by key, handling nested parentheses
     function extractValue(key: string): string | null {
       const keyUpper = key.toUpperCase();
-      const keyLower = key.toLowerCase();
       
       // Try both cases
       const regex = new RegExp(`\\b${keyUpper}\\s*=\\s*([A-Za-z0-9._-]+)`, 'i');
@@ -386,10 +387,11 @@ const Index = () => {
                 <p className="text-xs text-slate-500">Oracle Database Connection Manager</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                 {entries.length} {entries.length === 1 ? 'Entry' : 'Entries'}
               </Badge>
+              <span className="text-xs text-slate-400">v{APP_VERSION}</span>
             </div>
           </div>
         </div>
