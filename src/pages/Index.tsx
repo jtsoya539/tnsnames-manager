@@ -817,6 +817,7 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [newGroup, setNewGroup] = useState("");
+  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
 
   useEffect(() => {
     if (entry) {
@@ -869,8 +870,22 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
     if (newGroup.trim()) {
       setFormData({ ...formData, group: newGroup.trim() });
       setNewGroup("");
+      setShowNewGroupInput(false);
     }
   };
+
+  const handleGroupSelect = (value: string) => {
+    if (value === "__new__") {
+      setShowNewGroupInput(true);
+      setFormData({ ...formData, group: "" });
+    } else {
+      setShowNewGroupInput(false);
+      setFormData({ ...formData, group: value });
+    }
+  };
+
+  // Check if current group is in the groups list or is a custom new group
+  const isCustomGroup = formData.group && !groups.includes(formData.group);
 
   return (
     <DialogContent className="sm:max-w-[500px]">
@@ -947,40 +962,40 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
 
         <div className="space-y-2">
           <Label htmlFor="group">Group</Label>
-          <div className="flex gap-2">
-            <Select 
-              value={formData.group || "__new__"} 
-              onValueChange={(value) => {
-                if (value === "__new__") {
-                  setFormData({ ...formData, group: "" });
-                } else {
-                  setFormData({ ...formData, group: value });
-                }
-              }}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Select or create a group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__new__">+ Create New Group</SelectItem>
-                {groups.map(g => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {(!formData.group || formData.group === "__new__") && (
+          <Select 
+            value={showNewGroupInput ? "__new__" : (formData.group || "__none__")} 
+            onValueChange={handleGroupSelect}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select or create a group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No Group</SelectItem>
+              <SelectItem value="__new__">+ Create New Group</SelectItem>
+              {groups.map(g => (
+                <SelectItem key={g} value={g}>{g}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {showNewGroupInput && (
             <div className="flex gap-2 mt-2">
               <Input
-                placeholder="New group name"
+                placeholder="Enter new group name"
                 value={newGroup}
                 onChange={(e) => setNewGroup(e.target.value)}
                 className="flex-1"
               />
-              <Button type="button" variant="outline" onClick={handleAddNewGroup}>
+              <Button type="button" variant="outline" onClick={handleAddNewGroup} disabled={!newGroup.trim()}>
                 Add
               </Button>
             </div>
+          )}
+          
+          {isCustomGroup && !showNewGroupInput && (
+            <p className="text-xs text-indigo-600 mt-1">
+              New group: "{formData.group}" will be created
+            </p>
           )}
         </div>
 
