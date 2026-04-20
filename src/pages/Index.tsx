@@ -28,126 +28,119 @@ interface TnsEntry {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-// Parse tnsnames.ora content - robust version with group support
+// Parse tnsnames.ora content - robust version
 function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[] } {
   const entries: TnsEntry[] = [];
   const groups: string[] = [];
   
-  // Split into lines
-  const lines = content.split('\n');
+  // Remove Windows line endings and normalize
+  const normalizedContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   
-  // First pass: find all group comments and their line positions
-  const groupPositions: { line: number; group: string }[] = [];
+  // Find all group comments first
+  const groupRegex = /^#\s*GROUP:\s*(.+)$/gim;
+  let groupMatch;
+  while ((groupMatch = groupRegex.exec(normalizedContent)) !== null) {
+    const groupName = groupMatch[1].trim();
+    if (groupName && !groups.includes(groupName)) {
+      groups.push(groupName);
+    }
+  }
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    // Skip empty lines
-    if (!line) continue;
+  // Remove all comments from content for easier parsing
+  // But keep track of where groups are
+  const lines = normalizedContent.split('\n');
+  const processedLines: { line: string; groupBefore: string | null }[] = [];
+  
+  let currentGroup: string | null = null;
+  for (const line of lines) {
+    const trimmed = line.trim();
     
-    // Check for group comments (but not other comments)
-    if (line.startsWith('#')) {
-      const comment = line.substring(1).trim();
-      if (comment.toUpperCase().startsWith('GROUP:')) {
-        const groupName = comment.substring(6).trim();
-        if (groupName && !groups.includes(groupName)) {
-          groups.push(groupName);
-        }
-        groupPositions.push({ line: i, group: groupName });
-      }
-      // Skip other comments (non-group comments)
+    // Check for group comment
+    if (trimmed.match(/^#\s*GROUP:\s*/i)) {
+      currentGroup = trimmed.replace(/^#\s*GROUP:\s*/i, '').trim();
       continue;
     }
     
-    // Skip lines that don't look like alias definitions
-    if (!line.includes('=')) continue;
-  }
-  
-  // Second pass: find all alias = entries
-  const aliasPositions: { line: number; alias: string }[] = [];
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Skip empty lines
-    if (!line) continue;
-    
-    // Skip comments
-    if (line.startsWith('#')) continue;
-    
-    // Match alias = or alias = ( pattern
-    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\()?$/);
-    if (match) {
-      aliasPositions.push({ line: i, alias: match[1] });
-    }
-  }
-  
-  // For each entry, find the most recent group comment before it
-  for (const aliasPos of aliasPositions) {
-    // Find the most recent group comment before this entry
-    let entryGroup: string | undefined;
-    for (let i = groupPositions.length - 1; i >= 0; i--) {
-      if (groupPositions[i].line < aliasPos.line) {
-        entryGroup = groupPositions[i].group;
-        break;
-      }
+    // Skip other comments
+    if (trimmed.startsWith('#') && !trimmed.match(/^#\s*GROUP:/i)) {
+      continue;
     }
     
-    // Extract the entry content (from alias line to matching closing parenthesis)
-    let braceLevel = 0;
-    let entryStartLine = aliasPos.line;
-    let entryEndLine = aliasPos.line;
-    let foundOpenParen = false;
+    processedLines.push({ line, groupBefore: currentGroup });
+  }
+  
+  // Now find all alias = entries in the processed lines
+  let i = 0;
+  while (i < processedLines.length) {
+    const { line, groupBefore } = processedLines[i];
+    const trimmed = line.trim();
     
-    for (let i = aliasPos.line; i < lines.length; i++) {
-      const line = lines[i];
-      for (const char of line) {
-        if (char === '(') {
-          braceLevel++;
-          foundOpenParen = true;
+    // Look for alias = pattern (with optional opening paren on same line)
+    const aliasMatch = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/);
+    
+    if (aliasMatch) {
+      const alias = aliasMatch[1];
+      let entryContent = trimmed;
+      let j = i + 1;
+      
+      // Collect all lines until we have balanced parentheses
+      let parenCount = 0;
+      let foundFirstParen = false;
+      
+      while (j < processedLines.length) {
+        const nextLine = processedLines[j].line;
+        entryContent += ' ' + nextLine;
+        
+        // Count parentheses
+        for (const char of nextLine) {
+          if (char === '(') {
+            parenCount++;
+            foundFirstParen = true;
+          }
+          if (char === ')') parenCount--;
         }
-        if (char === ')') braceLevel--;
+        
+        j++;
+        if (foundFirstParen && parenCount === 0) break;
       }
-      entryEndLine = i;
-      if (foundOpenParen && braceLevel === 0) break;
-    }
-    
-    // Join entry lines
-    const entryLines = lines.slice(entryStartLine, entryEndLine + 1).join(' ');
-    
-    // Extract values from entry content
-    const entry: Partial<TnsEntry> = {
-      id: generateId(),
-      alias: aliasPos.alias,
-      host: '',
-      port: '1521',
-      serviceName: '',
-      protocol: 'TCP',
-      description: aliasPos.alias,
-      group: entryGroup
-    };
-    
-    // Helper function to extract value by key
-    function extractValue(key: string): string | null {
-      const keyUpper = key.toUpperCase();
-      const regex = new RegExp(`\\b${keyUpper}\\s*=\\s*([A-Za-z0-9._-]+)`, 'i');
-      const match = entryLines.match(regex);
-      return match ? match[1] : null;
-    }
-    
-    const hostValue = extractValue('HOST');
-    if (hostValue) entry.host = hostValue;
-    
-    const portValue = extractValue('PORT');
-    if (portValue) entry.port = portValue;
-    
-    const protocolValue = extractValue('PROTOCOL');
-    if (protocolValue) entry.protocol = protocolValue.toUpperCase();
-    
-    const serviceNameValue = extractValue('SERVICE_NAME') || extractValue('SID');
-    if (serviceNameValue) entry.serviceName = serviceNameValue;
-    
-    if (entry.host && entry.serviceName) {
-      entries.push(entry as TnsEntry);
+      
+      // Extract values from entry content
+      const entry: Partial<TnsEntry> = {
+        id: generateId(),
+        alias: alias,
+        host: '',
+        port: '1521',
+        serviceName: '',
+        protocol: 'TCP',
+        description: alias,
+        group: groupBefore || undefined
+      };
+      
+      // Extract HOST
+      const hostMatch = entryContent.match(/\bHOST\s*=\s*([^\s)]+)/i);
+      if (hostMatch) entry.host = hostMatch[1].trim();
+      
+      // Extract PORT
+      const portMatch = entryContent.match(/\bPORT\s*=\s*(\d+)/i);
+      if (portMatch) entry.port = portMatch[1].trim();
+      
+      // Extract PROTOCOL
+      const protocolMatch = entryContent.match(/\bPROTOCOL\s*=\s*([^\s)]+)/i);
+      if (protocolMatch) entry.protocol = protocolMatch[1].trim().toUpperCase();
+      
+      // Extract SERVICE_NAME or SID
+      const serviceNameMatch = entryContent.match(/\bSERVICE_NAME\s*=\s*([^\s)]+)/i) || 
+                               entryContent.match(/\bSID\s*=\s*([^\s)]+)/i);
+      if (serviceNameMatch) entry.serviceName = serviceNameMatch[1].trim();
+      
+      // Only add if we have at least host and serviceName
+      if (entry.host && entry.serviceName) {
+        entries.push(entry as TnsEntry);
+      }
+      
+      i = j;
+    } else {
+      i++;
     }
   }
   
