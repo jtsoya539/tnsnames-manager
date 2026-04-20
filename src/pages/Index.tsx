@@ -36,14 +36,15 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
   // Split into lines
   const lines = content.split('\n');
   
-  // Track current group
-  let currentGroup: string | undefined;
-  
   // First pass: find all group comments and their line positions
   const groupPositions: { line: number; group: string }[] = [];
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+    // Skip empty lines
+    if (!line) continue;
+    
+    // Check for group comments (but not other comments)
     if (line.startsWith('#')) {
       const comment = line.substring(1).trim();
       if (comment.toUpperCase().startsWith('GROUP:')) {
@@ -53,16 +54,28 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
         }
         groupPositions.push({ line: i, group: groupName });
       }
+      // Skip other comments (non-group comments)
+      continue;
     }
+    
+    // Skip lines that don't look like alias definitions
+    if (!line.includes('=')) continue;
   }
   
-  // Find all alias = entries and their line positions
+  // Second pass: find all alias = entries
   const aliasPositions: { line: number; alias: string }[] = [];
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    // Match alias = pattern (with or without opening parenthesis on same line)
-    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/);
+    
+    // Skip empty lines
+    if (!line) continue;
+    
+    // Skip comments
+    if (line.startsWith('#')) continue;
+    
+    // Match alias = or alias = ( pattern
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\()?$/);
     if (match) {
       aliasPositions.push({ line: i, alias: match[1] });
     }
