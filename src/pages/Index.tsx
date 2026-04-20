@@ -35,11 +35,11 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
   const entries: TnsEntry[] = [];
   const groups: string[] = [];
   
-  // Split into lines and process
+  // Split into lines
   const lines = content.split('\n');
   
+  // Track current group
   let currentGroup: string | undefined;
-  let currentLineIndex = 0;
   
   // First pass: find all group comments and their line positions
   const groupPositions: { line: number; group: string }[] = [];
@@ -58,15 +58,15 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
     }
   }
   
-  // Second pass: find all alias = ( entries and their line positions
-  const aliasPositions: { line: number; alias: string; startPos: number }[] = [];
+  // Find all alias = entries and their line positions
+  const aliasPositions: { line: number; alias: string }[] = [];
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    // Match alias = ( pattern
-    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\($/);
+    // Match alias = pattern (with or without opening parenthesis on same line)
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/);
     if (match) {
-      aliasPositions.push({ line: i, alias: match[1], startPos: lines[i].indexOf(match[1]) });
+      aliasPositions.push({ line: i, alias: match[1] });
     }
   }
   
@@ -85,15 +85,19 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
     let braceLevel = 0;
     let entryStartLine = aliasPos.line;
     let entryEndLine = aliasPos.line;
+    let foundOpenParen = false;
     
     for (let i = aliasPos.line; i < lines.length; i++) {
       const line = lines[i];
       for (const char of line) {
-        if (char === '(') braceLevel++;
+        if (char === '(') {
+          braceLevel++;
+          foundOpenParen = true;
+        }
         if (char === ')') braceLevel--;
       }
       entryEndLine = i;
-      if (braceLevel === 0) break;
+      if (foundOpenParen && braceLevel === 0) break;
     }
     
     // Join entry lines
