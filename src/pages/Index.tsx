@@ -28,15 +28,15 @@ interface TnsEntry {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-// Parse tnsnames.ora content - robust version
+// Parse tnsnames.ora content - very flexible version
 function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[] } {
   const entries: TnsEntry[] = [];
   const groups: string[] = [];
   
-  // Remove Windows line endings and normalize
+  // Normalize line endings
   const normalizedContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   
-  // Find all group comments first
+  // Find all group comments
   const groupRegex = /^#\s*GROUP:\s*(.+)$/gim;
   let groupMatch;
   while ((groupMatch = groupRegex.exec(normalizedContent)) !== null) {
@@ -46,8 +46,7 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
     }
   }
   
-  // Remove all comments from content for easier parsing
-  // But keep track of where groups are
+  // Split into lines and process
   const lines = normalizedContent.split('\n');
   const processedLines: { line: string; groupBefore: string | null }[] = [];
   
@@ -61,86 +60,98 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
       continue;
     }
     
-    // Skip other comments
-    if (trimmed.startsWith('#') && !trimmed.match(/^#\s*GROUP:/i)) {
+    // Skip other comments (lines starting with #)
+    if (trimmed.startsWith('#')) {
+      continue;
+    }
+    
+    // Skip empty lines
+    if (!trimmed) {
       continue;
     }
     
     processedLines.push({ line, groupBefore: currentGroup });
   }
   
-  // Now find all alias = entries in the processed lines
-  let i = 0;
-  while (i < processedLines.length) {
-    const { line, groupBefore } = processedLines[i];
-    const trimmed = line.trim();
+  // Join all content into one string for easier regex matching
+  // But preserve line boundaries for parsing
+  const allContent = processedLines.map(p => p.line).join('\n');
+  
+  // Find all alias = patterns more flexibly
+  // Match: ALIAS = or ALIAS = ( or ALIAS=
+  const aliasRegex = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\()?/gm;
+  
+  let match;
+  while ((match = aliasRegex.exec(allContent)) !== null) {
+    const alias = match[1];
+    const startPos = match.index;
     
-    // Look for alias = pattern (with optional opening paren on same line)
-    const aliasMatch = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/);
+    // Find the end of this entry by counting parentheses
+    let parenCount = 0;
+    let hasFirstParen = false;
+    let endPos = startPos;
     
-    if (aliasMatch) {
-      const alias = aliasMatch[1];
-      let entryContent = trimmed;
-      let j = i + 1;
-      
-      // Collect all lines until we have balanced parentheses
-      let parenCount = 0;
-      let foundFirstParen = false;
-      
-      while (j < processedLines.length) {
-        const nextLine = processedLines[j].line;
-        entryContent += ' ' + nextLine;
-        
-        // Count parentheses
-        for (const char of nextLine) {
-          if (char === '(') {
-            parenCount++;
-            foundFirstParen = true;
-          }
-          if (char === ')') parenCount--;
-        }
-        
-        j++;
-        if (foundFirstParen && parenCount === 0) break;
+    for (let i = startPos; i < allContent.length; i++) {
+      if (allContent[i] === '(') {
+        parenCount++;
+        hasFirstParen = true;
       }
-      
-      // Extract values from entry content
-      const entry: Partial<TnsEntry> = {
-        id: generateId(),
-        alias: alias,
-        host: '',
-        port: '1521',
-        serviceName: '',
-        protocol: 'TCP',
-        description: alias,
-        group: groupBefore || undefined
-      };
-      
-      // Extract HOST
-      const hostMatch = entryContent.match(/\bHOST\s*=\s*([^\s)]+)/i);
-      if (hostMatch) entry.host = hostMatch[1].trim();
-      
-      // Extract PORT
-      const portMatch = entryContent.match(/\bPORT\s*=\s*(\d+)/i);
-      if (portMatch) entry.port = portMatch[1].trim();
-      
-      // Extract PROTOCOL
-      const protocolMatch = entryContent.match(/\bPROTOCOL\s*=\s*([^\s)]+)/i);
-      if (protocolMatch) entry.protocol = protocolMatch[1].trim().toUpperCase();
-      
-      // Extract SERVICE_NAME or SID
-      const serviceNameMatch = entryContent.match(/\bSERVICE_NAME\s*=\s*([^\s)]+)/i) || 
-                               entryContent.match(/\bSID\s*=\s*([^\s)]+)/i);
-      if (serviceNameMatch) entry.serviceName = serviceNameMatch[1].trim();
-      
-      // Only add if we have at least host and serviceName
-      if (entry.host && entry.serviceName) {
-        entries.push(entry as TnsEntry);
+      if (allContent[i] === ')') {
+        parenCount--;
       }
-      
-      i = j;
-    } else {
-      i++;
+      endPos = i;
+      if (hasFirstParen && parenCount === 0) {
+        break;
+      }
+    }
+    
+    // Extract entry content
+    const entryContent = allContent.substring(startPos, endPos + 1);
+    
+    // Find which group this entry belongs to by checking position
+    let entryGroup: string | undefined;
+    let lineStartPos = 0;
+    for (let i = 0; i < processedLines.length; i++) {
+      const lineStart = allContent.indexOf(processedLines[i].line, lineStartPos);
+      if (lineStart >= startPos) {
+        entryGroup = processedLines[i].groupBefore || undefined;
+        break;
+      }
+      lineStartPos = lineStart + processedLines[i].line.length + 1;
+    }
+    
+    // Extract values from entry content
+    const entry: Partial<TnsEntry> = {
+      id: generateId(),
+      alias: alias,
+      host: '',
+      port: '1521',
+      serviceName: '',
+      protocol: 'TCP',
+      description: alias,
+      group: entryGroup
+    };
+    
+    // Extract HOST - more flexible regex
+    const hostMatch = entryContent.match(/\bHOST\s*=\s*([^\s)]+)/i);
+    if (hostMatch) entry.host = hostMatch[1].trim();
+    
+    // Extract PORT
+    const portMatch = entryContent.match(/\bPORT\s*=\s*(\d+)/i);
+    if (portMatch) entry.port = portMatch[1].trim();
+    
+    // Extract PROTOCOL
+    const protocolMatch = entryContent.match(/\bPROTOCOL\s*=\s*([^\s)]+)/i);
+    if (protocolMatch) entry.protocol = protocolMatch[1].trim().toUpperCase();
+    
+    // Extract SERVICE_NAME or SID
+    const serviceNameMatch = entryContent.match(/\bSERVICE_NAME\s*=\s*([^\s)]+)/i) || 
+                             entryContent.match(/\bSID\s*=\s*([^\s)]+)/i);
+    if (serviceNameMatch) entry.serviceName = serviceNameMatch[1].trim();
+    
+    // Only add if we have at least host and serviceName
+    if (entry.host && entry.serviceName) {
+      entries.push(entry as TnsEntry);
     }
   }
   
