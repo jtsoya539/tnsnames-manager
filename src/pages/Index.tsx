@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Upload, FileDown, FileUp, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Upload, FileDown, FileUp, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network, ArrowDownAZ, ArrowUpAZ, FolderOpen } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showSuccess, showError } from "@/utils/toast";
 
 const APP_VERSION = "1.0.0";
@@ -23,6 +24,8 @@ interface TnsEntry {
   protocol: string;
   description: string;
 }
+
+type GroupBy = "none" | "firstLetter";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -170,6 +173,40 @@ function validateEntry(entry: Partial<TnsEntry>): string[] {
   return errors;
 }
 
+// Sort entries alphabetically by alias
+function sortEntries(entries: TnsEntry[]): TnsEntry[] {
+  return [...entries].sort((a, b) => 
+    a.alias.toLowerCase().localeCompare(b.alias.toLowerCase())
+  );
+}
+
+// Group entries by first letter
+function groupEntries(entries: TnsEntry[]): Map<string, TnsEntry[]> {
+  const groups = new Map<string, TnsEntry[]>();
+  
+  entries.forEach(entry => {
+    const firstLetter = entry.alias.charAt(0).toUpperCase();
+    const group = /[A-Z]/.test(firstLetter) ? firstLetter : '#';
+    
+    if (!groups.has(group)) {
+      groups.set(group, []);
+    }
+    groups.get(group)!.push(entry);
+  });
+  
+  // Sort groups by key
+  const sortedGroups = new Map([...groups.entries()].sort());
+  
+  // Sort entries within each group
+  sortedGroups.forEach((groupEntries, key) => {
+    sortedGroups.set(key, groupEntries.sort((a, b) => 
+      a.alias.toLowerCase().localeCompare(b.alias.toLowerCase())
+    ));
+  });
+  
+  return sortedGroups;
+}
+
 const Index = () => {
   const [entries, setEntries] = useState<TnsEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -179,13 +216,34 @@ const Index = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [rawContent, setRawContent] = useState("");
   const [activeTab, setActiveTab] = useState("entries");
+  const [sortBy, setSortBy] = useState<"none" | "alpha">("none");
+  const [groupBy, setGroupBy] = useState<GroupBy>("none");
+
+  // Get entries ready for display/export with sorting applied
+  const processedEntries = useMemo(() => {
+    let result = [...entries];
+    if (sortBy === "alpha") {
+      result = sortEntries(result);
+    }
+    return result;
+  }, [entries, sortBy]);
 
   // Filter entries based on search
-  const filteredEntries = entries.filter(entry =>
-    entry.alias.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    entry.host.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    entry.serviceName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredEntries = useMemo(() => {
+    return processedEntries.filter(entry =>
+      entry.alias.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      entry.host.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      entry.serviceName.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [processedEntries, searchQuery]);
+
+  // Grouped entries for display
+  const groupedEntries = useMemo(() => {
+    if (groupBy === "none") {
+      return null;
+    }
+    return groupEntries(filteredEntries);
+  }, [filteredEntries, groupBy]);
 
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -310,7 +368,7 @@ const Index = () => {
 
     // Validate all entries first
     const allErrors: { alias: string; errors: string[] }[] = [];
-    entries.forEach((entry) => {
+    processedEntries.forEach((entry) => {
       const errors = validateEntry(entry);
       if (errors.length > 0) {
         allErrors.push({ alias: entry.alias, errors });
@@ -322,7 +380,7 @@ const Index = () => {
       return;
     }
 
-    const content = generateTnsnames(entries);
+    const content = generateTnsnames(processedEntries);
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -340,7 +398,7 @@ const Index = () => {
       return;
     }
 
-    const json = JSON.stringify(entries, null, 2);
+    const json = JSON.stringify(processedEntries, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -358,7 +416,7 @@ const Index = () => {
       return;
     }
 
-    const yaml = entries.map(entry => 
+    const yaml = processedEntries.map(entry => 
       `${entry.alias}:\n  host: ${entry.host}\n  port: ${entry.port}\n  service_name: ${entry.serviceName}\n  protocol: ${entry.protocol || 'TCP'}`
     ).join('\n\n');
 
@@ -428,6 +486,43 @@ const Index = () => {
           </Dialog>
 
           <div className="flex-1" />
+
+          {/* Sort and Group Controls */}
+          <div className="flex items-center gap-2">
+            <Select value={sortBy} onValueChange={(value: "none" | "alpha") => setSortBy(value)}>
+              <SelectTrigger className="w-[140px] bg-white">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <div className="flex items-center gap-2">
+                    <span>No Sort</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="alpha">
+                  <div className="flex items-center gap-2">
+                    <ArrowDownAZ className="w-4 h-4" />
+                    <span>A-Z</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={groupBy} onValueChange={(value: GroupBy) => setGroupBy(value)}>
+              <SelectTrigger className="w-[160px] bg-white">
+                <SelectValue placeholder="Group by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Grouping</SelectItem>
+                <SelectItem value="firstLetter">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4" />
+                    <span>First Letter</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <Button variant="outline" onClick={handleExportJson} disabled={entries.length === 0} className="gap-2">
             <FileDown className="w-4 h-4" />
@@ -507,20 +602,50 @@ const Index = () => {
                   </p>
                 )}
 
-                {/* Entries Grid */}
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredEntries.map((entry) => (
-                    <EntryCard
-                      key={entry.id}
-                      entry={entry}
-                      onEdit={() => {
-                        setEditingEntry(entry);
-                        setIsEditDialogOpen(true);
-                      }}
-                      onDelete={() => handleDeleteEntry(entry.id)}
-                    />
-                  ))}
-                </div>
+                {/* Entries Grid - with or without grouping */}
+                {groupedEntries ? (
+                  <div className="space-y-8">
+                    {Array.from(groupedEntries.entries()).map(([group, groupEntries]) => (
+                      <div key={group}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge variant="secondary" className="text-sm px-3 py-1">
+                            {group}
+                          </Badge>
+                          <span className="text-sm text-slate-400">
+                            ({groupEntries.length} {groupEntries.length === 1 ? 'entry' : 'entries'})
+                          </span>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {groupEntries.map((entry) => (
+                            <EntryCard
+                              key={entry.id}
+                              entry={entry}
+                              onEdit={() => {
+                                setEditingEntry(entry);
+                                setIsEditDialogOpen(true);
+                              }}
+                              onDelete={() => handleDeleteEntry(entry.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredEntries.map((entry) => (
+                      <EntryCard
+                        key={entry.id}
+                        entry={entry}
+                        onEdit={() => {
+                          setEditingEntry(entry);
+                          setIsEditDialogOpen(true);
+                        }}
+                        onDelete={() => handleDeleteEntry(entry.id)}
+                      />
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </TabsContent>
