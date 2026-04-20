@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Upload, FileDown, FileUp, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network, ArrowDownAZ, Folder, FolderOpen, Settings } from "lucide-react";
+import { Upload, FileDown, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network, ArrowDownAZ, Folder } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,11 +74,9 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
   }
   
   // Join all content into one string for easier regex matching
-  // But preserve line boundaries for parsing
   const allContent = processedLines.map(p => p.line).join('\n');
   
-  // Find all alias = patterns more flexibly
-  // Match: ALIAS = or ALIAS = ( or ALIAS=
+  // Find all alias = patterns
   const aliasRegex = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\()?/gm;
   
   let match;
@@ -132,7 +130,7 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
       group: entryGroup
     };
     
-    // Extract HOST - more flexible regex
+    // Extract HOST
     const hostMatch = entryContent.match(/\bHOST\s*=\s*([^\s)]+)/i);
     if (hostMatch) entry.host = hostMatch[1].trim();
     
@@ -566,45 +564,6 @@ const Index = () => {
     showSuccess("Exported tnsnames.ora successfully");
   };
 
-  // Export as JSON
-  const handleExportJson = () => {
-    if (entries.length === 0) {
-      showError("No entries to export");
-      return;
-    }
-
-    const json = JSON.stringify(processedEntries, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "tnsnames.json";
-    a.click();
-    URL.revokeObjectURL(url);
-    showSuccess("Exported JSON successfully");
-  };
-
-  // Export as YAML
-  const handleExportYaml = () => {
-    if (entries.length === 0) {
-      showError("No entries to export");
-      return;
-    }
-
-    const yaml = processedEntries.map(entry => 
-      `${entry.alias}:\n  host: ${entry.host}\n  port: ${entry.port}\n  service_name: ${entry.serviceName}\n  protocol: ${entry.protocol || 'TCP'}${entry.group ? `\n  group: ${entry.group}` : ''}`
-    ).join('\n\n');
-
-    const blob = new Blob([yaml], { type: "text/yaml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "tnsnames.yaml";
-    a.click();
-    URL.revokeObjectURL(url);
-    showSuccess("Exported YAML successfully");
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
@@ -702,14 +661,6 @@ const Index = () => {
             </Select>
           </div>
 
-          <Button variant="outline" onClick={handleExportJson} disabled={entries.length === 0} className="gap-2">
-            <FileDown className="w-4 h-4" />
-            JSON
-          </Button>
-          <Button variant="outline" onClick={handleExportYaml} disabled={entries.length === 0} className="gap-2">
-            <FileDown className="w-4 h-4" />
-            YAML
-          </Button>
           <Button onClick={handleExportTnsnames} disabled={entries.length === 0} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
             <Save className="w-4 h-4" />
             Export .ora
@@ -724,7 +675,7 @@ const Index = () => {
               Connections
             </TabsTrigger>
             <TabsTrigger value="raw" className="gap-2">
-              <FileUp className="w-4 h-4" />
+              <FileDown className="w-4 h-4" />
               Paste Content
             </TabsTrigger>
           </TabsList>
@@ -833,7 +784,7 @@ const Index = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileUp className="w-5 h-5" />
+                  <FileDown className="w-5 h-5" />
                   Paste tnsnames.ora Content
                 </CardTitle>
                 <CardDescription>
