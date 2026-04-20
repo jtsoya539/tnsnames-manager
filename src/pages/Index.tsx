@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Upload, FileDown, FileUp, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network, ArrowDownAZ, ArrowUpAZ, FolderOpen, Folder } from "lucide-react";
+import { Upload, FileDown, FileUp, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network, ArrowDownAZ, Folder, FolderOpen, Settings } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -227,6 +227,111 @@ function groupEntries(entries: TnsEntry[]): Map<string, TnsEntry[]> {
   return groups;
 }
 
+// Group Management Dialog Component
+interface GroupManagementDialogProps {
+  groups: string[];
+  entries: TnsEntry[];
+  onAddGroup: (name: string) => void;
+  onDeleteGroup: (name: string) => void;
+  onRenameGroup: (oldName: string, newName: string) => void;
+}
+
+const GroupManagementDialog = ({ groups, entries, onAddGroup, onDeleteGroup, onRenameGroup }: GroupManagementDialogProps) => {
+  const [newGroupName, setNewGroupName] = useState("");
+  const [editingGroup, setEditingGroup] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  const handleAddGroup = () => {
+    if (newGroupName.trim() && !groups.includes(newGroupName.trim())) {
+      onAddGroup(newGroupName.trim());
+      setNewGroupName("");
+    }
+  };
+
+  const handleStartEdit = (group: string) => {
+    setEditingGroup(group);
+    setEditName(group);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingGroup && editName.trim() && editName !== editingGroup) {
+      onRenameGroup(editingGroup, editName.trim());
+    }
+    setEditingGroup(null);
+    setEditName("");
+  };
+
+  const getEntryCount = (group: string) => {
+    return entries.filter(e => e.group === group).length;
+  };
+
+  return (
+    <DialogContent className="sm:max-w-[500px]">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Folder className="w-5 h-5" />
+          Manage Groups
+        </DialogTitle>
+        <DialogDescription>
+          Create, rename, or delete groups. Entries can be assigned to groups when editing.
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div className="space-y-4">
+        {/* Add new group */}
+        <div className="flex gap-2">
+          <Input
+            placeholder="New group name"
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddGroup()}
+          />
+          <Button onClick={handleAddGroup} disabled={!newGroupName.trim()}>
+            Add
+          </Button>
+        </div>
+
+        {/* Group list */}
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          {groups.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">No groups yet. Create one above.</p>
+          ) : (
+            groups.map(group => (
+              <div key={group} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                {editingGroup === group ? (
+                  <>
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
+                      className="flex-1"
+                      autoFocus
+                    />
+                    <Button size="sm" onClick={handleSaveEdit}>Save</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingGroup(null)}>Cancel</Button>
+                  </>
+                ) : (
+                  <>
+                    <Folder className="w-4 h-4 text-indigo-500" />
+                    <span className="flex-1 font-medium">{group}</span>
+                    <span className="text-xs text-slate-400">({getEntryCount(group)} entries)</span>
+                    <Button size="sm" variant="ghost" onClick={() => handleStartEdit(group)}>
+                      <Edit2 className="w-3 h-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => onDeleteGroup(group)}>
+                      <Trash2 className="w-3 h-3 text-red-500" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </DialogContent>
+  );
+};
+
 const Index = () => {
   const [entries, setEntries] = useState<TnsEntry[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
@@ -235,6 +340,7 @@ const Index = () => {
   const [editingEntry, setEditingEntry] = useState<TnsEntry | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [rawContent, setRawContent] = useState("");
   const [activeTab, setActiveTab] = useState("entries");
   const [sortBy, setSortBy] = useState<"none" | "alpha">("none");
@@ -351,11 +457,6 @@ const Index = () => {
       id: generateId(),
     };
     
-    // Add new group if needed
-    if (entry.group && entry.group.trim() && !groups.includes(entry.group)) {
-      setGroups([...groups, entry.group]);
-    }
-    
     setEntries([...entries, entry]);
     setIsAddDialogOpen(false);
     showSuccess(`Added entry "${entry.alias}"`);
@@ -375,11 +476,6 @@ const Index = () => {
       return;
     }
 
-    // Add new group if needed
-    if (updatedEntry.group && updatedEntry.group.trim() && !groups.includes(updatedEntry.group)) {
-      setGroups([...groups, updatedEntry.group]);
-    }
-
     setEntries(entries.map(e => e.id === updatedEntry.id ? updatedEntry : e));
     setIsEditDialogOpen(false);
     setEditingEntry(null);
@@ -391,6 +487,36 @@ const Index = () => {
     const entry = entries.find(e => e.id === id);
     setEntries(entries.filter(e => e.id !== id));
     showSuccess(`Deleted entry "${entry?.alias}"`);
+  };
+
+  // Add new group
+  const handleAddGroup = (name: string) => {
+    if (!groups.includes(name)) {
+      setGroups([...groups, name]);
+      showSuccess(`Created group "${name}"`);
+    }
+  };
+
+  // Delete group
+  const handleDeleteGroup = (name: string) => {
+    // Remove group from all entries
+    const updatedEntries = entries.map(e => 
+      e.group === name ? { ...e, group: "" } : e
+    );
+    setEntries(updatedEntries);
+    setGroups(groups.filter(g => g !== name));
+    showSuccess(`Deleted group "${name}"`);
+  };
+
+  // Rename group
+  const handleRenameGroup = (oldName: string, newName: string) => {
+    // Update group in all entries
+    const updatedEntries = entries.map(e => 
+      e.group === oldName ? { ...e, group: newName } : e
+    );
+    setEntries(updatedEntries);
+    setGroups(groups.map(g => g === oldName ? newName : g));
+    showSuccess(`Renamed group to "${newName}"`);
   };
 
   // Export as tnsnames.ora
@@ -517,6 +643,23 @@ const Index = () => {
               title="Add New Connection"
               groups={groups}
               onSubmit={handleAddEntry}
+            />
+          </Dialog>
+
+          {/* Manage Groups Button */}
+          <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Folder className="w-4 h-4" />
+                Groups ({groups.length})
+              </Button>
+            </DialogTrigger>
+            <GroupManagementDialog
+              groups={groups}
+              entries={entries}
+              onAddGroup={handleAddGroup}
+              onDeleteGroup={handleDeleteGroup}
+              onRenameGroup={handleRenameGroup}
             />
           </Dialog>
 
@@ -816,8 +959,6 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [newGroup, setNewGroup] = useState("");
-  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
 
   useEffect(() => {
     if (entry) {
@@ -865,27 +1006,6 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
       onSubmit(formData);
     }
   };
-
-  const handleAddNewGroup = () => {
-    if (newGroup.trim()) {
-      setFormData({ ...formData, group: newGroup.trim() });
-      setNewGroup("");
-      setShowNewGroupInput(false);
-    }
-  };
-
-  const handleGroupSelect = (value: string) => {
-    if (value === "__new__") {
-      setShowNewGroupInput(true);
-      setFormData({ ...formData, group: "" });
-    } else {
-      setShowNewGroupInput(false);
-      setFormData({ ...formData, group: value });
-    }
-  };
-
-  // Check if current group is in the groups list or is a custom new group
-  const isCustomGroup = formData.group && !groups.includes(formData.group);
 
   return (
     <DialogContent className="sm:max-w-[500px]">
@@ -963,40 +1083,21 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
         <div className="space-y-2">
           <Label htmlFor="group">Group</Label>
           <Select 
-            value={showNewGroupInput ? "__new__" : (formData.group || "__none__")} 
-            onValueChange={handleGroupSelect}
+            value={formData.group || "__none__"} 
+            onValueChange={(value) => {
+              setFormData({ ...formData, group: value === "__none__" ? "" : value });
+            }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select or create a group" />
+              <SelectValue placeholder="Select a group" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">No Group</SelectItem>
-              <SelectItem value="__new__">+ Create New Group</SelectItem>
               {groups.map(g => (
                 <SelectItem key={g} value={g}>{g}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          
-          {showNewGroupInput && (
-            <div className="flex gap-2 mt-2">
-              <Input
-                placeholder="Enter new group name"
-                value={newGroup}
-                onChange={(e) => setNewGroup(e.target.value)}
-                className="flex-1"
-              />
-              <Button type="button" variant="outline" onClick={handleAddNewGroup} disabled={!newGroup.trim()}>
-                Add
-              </Button>
-            </div>
-          )}
-          
-          {isCustomGroup && !showNewGroupInput && (
-            <p className="text-xs text-indigo-600 mt-1">
-              New group: "{formData.group}" will be created
-            </p>
-          )}
         </div>
 
         <div className="space-y-2">
