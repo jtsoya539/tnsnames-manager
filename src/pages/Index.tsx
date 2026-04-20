@@ -26,8 +26,6 @@ interface TnsEntry {
   group?: string;
 }
 
-type GroupBy = "none" | "custom";
-
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 // Parse tnsnames.ora content - robust version with group support
@@ -344,7 +342,6 @@ const Index = () => {
   const [rawContent, setRawContent] = useState("");
   const [activeTab, setActiveTab] = useState("entries");
   const [sortBy, setSortBy] = useState<"none" | "alpha">("none");
-  const [groupBy, setGroupBy] = useState<GroupBy>("none");
 
   // Get entries ready for display/export with sorting applied
   const processedEntries = useMemo(() => {
@@ -365,13 +362,14 @@ const Index = () => {
     );
   }, [processedEntries, searchQuery]);
 
-  // Grouped entries for display
+  // Grouped entries for display - always group when there are groups defined
   const groupedEntries = useMemo(() => {
-    if (groupBy === "none") {
+    // Only group if there are groups defined
+    if (groups.length === 0) {
       return null;
     }
     return groupEntries(filteredEntries);
-  }, [filteredEntries, groupBy]);
+  }, [filteredEntries, groups]);
 
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -665,7 +663,7 @@ const Index = () => {
 
           <div className="flex-1" />
 
-          {/* Sort and Group Controls */}
+          {/* Sort Control */}
           <div className="flex items-center gap-2">
             <Select value={sortBy} onValueChange={(value: "none" | "alpha") => setSortBy(value)}>
               <SelectTrigger className="w-[140px] bg-white">
@@ -681,21 +679,6 @@ const Index = () => {
                   <div className="flex items-center gap-2">
                     <ArrowDownAZ className="w-4 h-4" />
                     <span>A-Z</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={groupBy} onValueChange={(value: GroupBy) => setGroupBy(value)}>
-              <SelectTrigger className="w-[160px] bg-white">
-                <SelectValue placeholder="Group by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No Grouping</SelectItem>
-                <SelectItem value="custom">
-                  <div className="flex items-center gap-2">
-                    <Folder className="w-4 h-4" />
-                    <span>Custom Groups</span>
                   </div>
                 </SelectItem>
               </SelectContent>
