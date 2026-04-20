@@ -30,96 +30,92 @@ type GroupBy = "none" | "custom";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-// Parse tnsnames.ora content - robust version
+// Parse tnsnames.ora content - robust version with group support
 function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[] } {
   const entries: TnsEntry[] = [];
   const groups: string[] = [];
   
-  // Remove comments
+  // Split into lines and process
   const lines = content.split('\n');
-  let cleanLines: { line: string; comment?: string }[] = [];
+  
+  let currentGroup: string | undefined;
+  let currentLineIndex = 0;
+  
+  // First pass: find all group comments and their line positions
+  const groupPositions: { line: number; group: string }[] = [];
   
   for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-    let comment: string | undefined;
-    
-    // Extract comment if present
-    const commentIndex = line.indexOf('#');
-    if (commentIndex !== -1) {
-      const potentialComment = line.substring(commentIndex + 1).trim();
-      // Check if it's a group comment
-      if (potentialComment.toUpperCase().startsWith('GROUP:')) {
-        comment = potentialComment.substring(6).trim();
-        if (comment && !groups.includes(comment)) {
-          groups.push(comment);
+    const line = lines[i].trim();
+    if (line.startsWith('#')) {
+      const comment = line.substring(1).trim();
+      if (comment.toUpperCase().startsWith('GROUP:')) {
+        const groupName = comment.substring(6).trim();
+        if (groupName && !groups.includes(groupName)) {
+          groups.push(groupName);
         }
+        groupPositions.push({ line: i, group: groupName });
       }
-      line = line.substring(0, commentIndex);
-    }
-    
-    // Remove comments inside the line (but not inside strings)
-    let inString = false;
-    let result = '';
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j];
-      if (char === '"' && (j === 0 || line[j-1] !== '\\')) {
-        inString = !inString;
-        result += char;
-      } else if (char === '#' && !inString) {
-        break; // Rest of line is comment
-      } else {
-        result += char;
-      }
-    }
-    line = result.trim();
-    if (line) {
-      cleanLines.push({ line, comment });
     }
   }
   
-  // Join lines, preserving structure
-  let cleanContent = cleanLines.map(c => c.line).join(' ');
+  // Second pass: find all alias = ( entries and their line positions
+  const aliasPositions: { line: number; alias: string; startPos: number }[] = [];
   
-  // Track which group each entry belongs to
-  let currentGroup: string | undefined;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    // Match alias = ( pattern
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\($/);
+    if (match) {
+      aliasPositions.push({ line: i, alias: match[1], startPos: lines[i].indexOf(match[1]) });
+    }
+  }
   
-  // Find all alias = ( entries
-  const aliasRegex = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\(/g;
-  let match;
-  
-  while ((match = aliasRegex.exec(cleanContent)) !== null) {
-    const alias = match[1];
-    const startPos = match.index + match[0].length;
-    
-    // Find matching closing parenthesis
-    let braceLevel = 1;
-    let endPos = startPos;
-    
-    while (endPos < cleanContent.length && braceLevel > 0) {
-      if (cleanContent[endPos] === '(') braceLevel++;
-      else if (cleanContent[endPos] === ')') braceLevel--;
-      endPos++;
+  // For each entry, find the most recent group comment before it
+  for (const aliasPos of aliasPositions) {
+    // Find the most recent group comment before this entry
+    let entryGroup: string | undefined;
+    for (let i = groupPositions.length - 1; i >= 0; i--) {
+      if (groupPositions[i].line < aliasPos.line) {
+        entryGroup = groupPositions[i].group;
+        break;
+      }
     }
     
-    const entryContent = cleanContent.substring(startPos, endPos - 1);
+    // Extract the entry content (from alias line to matching closing parenthesis)
+    let braceLevel = 0;
+    let entryStartLine = aliasPos.line;
+    let entryEndLine = aliasPos.line;
+    
+    for (let i = aliasPos.line; i < lines.length; i++) {
+      const line = lines[i];
+      for (const char of line) {
+        if (char === '(') braceLevel++;
+        if (char === ')') braceLevel--;
+      }
+      entryEndLine = i;
+      if (braceLevel === 0) break;
+    }
+    
+    // Join entry lines
+    const entryLines = lines.slice(entryStartLine, entryEndLine + 1).join(' ');
     
     // Extract values from entry content
     const entry: Partial<TnsEntry> = {
       id: generateId(),
-      alias: alias,
+      alias: aliasPos.alias,
       host: '',
       port: '1521',
       serviceName: '',
       protocol: 'TCP',
-      description: alias,
-      group: currentGroup
+      description: aliasPos.alias,
+      group: entryGroup
     };
     
     // Helper function to extract value by key
     function extractValue(key: string): string | null {
       const keyUpper = key.toUpperCase();
       const regex = new RegExp(`\\b${keyUpper}\\s*=\\s*([A-Za-z0-9._-]+)`, 'i');
-      const match = entryContent.match(regex);
+      const match = entryLines.match(regex);
       return match ? match[1] : null;
     }
     
