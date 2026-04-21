@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Upload, FileDown, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network, ArrowDownAZ, Folder } from "lucide-react";
+import { Upload, FileDown, Plus, Search, X, Edit2, Trash2, Save, Database, Server, Globe, Network, ArrowDownAZ, Folder, Shield, Clock, Key } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast";
 
 const APP_VERSION = "1.0.0";
@@ -18,17 +19,47 @@ const APP_VERSION = "1.0.0";
 interface TnsEntry {
   id: string;
   alias: string;
+  // Description level
+  retryCount?: string;
+  retryDelay?: string;
+  timeout?: string;
+  sendTimeout?: string;
+  receiveTimeout?: string;
+  loadBalance?: string;
+  failover?: string;
+  sourceRoute?: string;
+  // Address level
   host: string;
   port: string;
-  serviceName: string;
   protocol: string;
+  ip?: string;
+  localAddress?: string;
+  // Connect data level
+  serviceName: string;
+  sid?: string;
+  instanceName?: string;
+  server?: string;
+  failoverMode?: string;
+  failoverType?: string;
+  failoverRetries?: string;
+  failoverDelay?: string;
+  loadBalanceTimeout?: string;
+  globalName?: string;
+  // Security level
+  myWalletDirectory?: string;
+  sslServerDnMatch?: string;
+  sslServerCertDn?: string;
+  authentication?: string;
+  certificate?: string;
+  privateKey?: string;
+  // Display
   description: string;
   group?: string;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-// Parse tnsnames.ora content - very flexible version
+// Parse tnsnames.ora content - supports all parameters
 function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[] } {
   const entries: TnsEntry[] = [];
   const groups: string[] = [];
@@ -130,22 +161,97 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
       group: entryGroup
     };
     
-    // Extract HOST
+    // Extract DESCRIPTION level parameters
+    const retryCountMatch = entryContent.match(/\bRETRY_COUNT\s*=\s*(\d+)/i);
+    if (retryCountMatch) entry.retryCount = retryCountMatch[1].trim();
+    
+    const retryDelayMatch = entryContent.match(/\bRETRY_DELAY\s*=\s*(\d+)/i);
+    if (retryDelayMatch) entry.retryDelay = retryDelayMatch[1].trim();
+    
+    const timeoutMatch = entryContent.match(/\bTIMEOUT\s*=\s*(\d+)/i);
+    if (timeoutMatch) entry.timeout = timeoutMatch[1].trim();
+    
+    const sendTimeoutMatch = entryContent.match(/\bSEND_TIMEOUT\s*=\s*(\d+)/i);
+    if (sendTimeoutMatch) entry.sendTimeout = sendTimeoutMatch[1].trim();
+    
+    const receiveTimeoutMatch = entryContent.match(/\bRECEIVE_TIMEOUT\s*=\s*(\d+)/i);
+    if (receiveTimeoutMatch) entry.receiveTimeout = receiveTimeoutMatch[1].trim();
+    
+    const loadBalanceMatch = entryContent.match(/\bLOAD_BALANCE\s*=\s*(on|off|yes|no)/i);
+    if (loadBalanceMatch) entry.loadBalance = loadBalanceMatch[1].trim().toUpperCase();
+    
+    const failoverMatch = entryContent.match(/\bFAILOVER\s*=\s*(on|off|yes|no)/i);
+    if (failoverMatch) entry.failover = failoverMatch[1].trim().toUpperCase();
+    
+    const sourceRouteMatch = entryContent.match(/\bSOURCE_ROUTE\s*=\s*(on|off|yes|no)/i);
+    if (sourceRouteMatch) entry.sourceRoute = sourceRouteMatch[1].trim().toUpperCase();
+    
+    // Extract ADDRESS level parameters
     const hostMatch = entryContent.match(/\bHOST\s*=\s*([^\s)]+)/i);
     if (hostMatch) entry.host = hostMatch[1].trim();
     
-    // Extract PORT
     const portMatch = entryContent.match(/\bPORT\s*=\s*(\d+)/i);
     if (portMatch) entry.port = portMatch[1].trim();
     
-    // Extract PROTOCOL
     const protocolMatch = entryContent.match(/\bPROTOCOL\s*=\s*([^\s)]+)/i);
     if (protocolMatch) entry.protocol = protocolMatch[1].trim().toUpperCase();
     
-    // Extract SERVICE_NAME or SID
+    const ipMatch = entryContent.match(/\bIP\s*=\s*([^\s)]+)/i);
+    if (ipMatch) entry.ip = ipMatch[1].trim();
+    
+    const localAddressMatch = entryContent.match(/\bLOCAL_ADDRESS\s*=\s*([^\s)]+)/i);
+    if (localAddressMatch) entry.localAddress = localAddressMatch[1].trim();
+    
+    // Extract CONNECT_DATA level parameters
     const serviceNameMatch = entryContent.match(/\bSERVICE_NAME\s*=\s*([^\s)]+)/i) || 
-                             entryContent.match(/\bSID\s*=\s*([^\s)]+)/i);
-    if (serviceNameMatch) entry.serviceName = serviceNameMatch[1].trim();
+                             entryContent.match(/\bSERVICE_NAME\s*=\s*\(([^)]+)\)/i);
+    if (serviceNameMatch) entry.serviceName = (serviceNameMatch[1] || serviceNameMatch[0].split('=')[1]).trim();
+    
+    const sidMatch = entryContent.match(/\bSID\s*=\s*([^\s)]+)/i);
+    if (sidMatch) entry.sid = sidMatch[1].trim();
+    
+    const instanceNameMatch = entryContent.match(/\bINSTANCE_NAME\s*=\s*([^\s)]+)/i);
+    if (instanceNameMatch) entry.instanceName = instanceNameMatch[1].trim();
+    
+    const serverMatch = entryContent.match(/\bSERVER\s*=\s*(DEDICATED|POOLED|SHARED)/i);
+    if (serverMatch) entry.server = serverMatch[1].trim().toUpperCase();
+    
+    const failoverModeMatch = entryContent.match(/\bFAILOVER_MODE\s*=\s*\(([^)]+)\)/i);
+    if (failoverModeMatch) entry.failoverMode = failoverModeMatch[1].trim();
+    
+    const failoverTypeMatch = entryContent.match(/\bFAILOVER_TYPE\s*=\s*(SESSION|SELECT|NONE)/i);
+    if (failoverTypeMatch) entry.failoverType = failoverTypeMatch[1].trim().toUpperCase();
+    
+    const failoverRetriesMatch = entryContent.match(/\bFAILOVER_RETRIES\s*=\s*(\d+)/i);
+    if (failoverRetriesMatch) entry.failoverRetries = failoverRetriesMatch[1].trim();
+    
+    const failoverDelayMatch = entryContent.match(/\bFAILOVER_DELAY\s*=\s*(\d+)/i);
+    if (failoverDelayMatch) entry.failoverDelay = failoverDelayMatch[1].trim();
+    
+    const loadBalanceTimeoutMatch = entryContent.match(/\bLOAD_BALANCE_TIMEOUT\s*=\s*(\d+)/i);
+    if (loadBalanceTimeoutMatch) entry.loadBalanceTimeout = loadBalanceTimeoutMatch[1].trim();
+    
+    const globalNameMatch = entryContent.match(/\bGLOBAL_NAME\s*=\s*([^\s)]+)/i);
+    if (globalNameMatch) entry.globalName = globalNameMatch[1].trim();
+    
+    // Extract SECURITY level parameters
+    const walletDirMatch = entryContent.match(/MY_WALLET_DIRECTORY\s*=\s*"([^"]+)"/i);
+    if (walletDirMatch) entry.myWalletDirectory = walletDirMatch[1].trim();
+    
+    const sslDnMatchMatch = entryContent.match(/SSL_SERVER_DN_MATCH\s*=\s*(yes|no)/i);
+    if (sslDnMatchMatch) entry.sslServerDnMatch = sslDnMatchMatch[1].trim().toUpperCase();
+    
+    const sslCertDnMatch = entryContent.match(/SSL_SERVER_CERT_DN\s*=\s*"([^"]+)"/i);
+    if (sslCertDnMatch) entry.sslServerCertDn = sslCertDnMatch[1].trim();
+    
+    const authMatch = entryContent.match(/\bAUTHENTICATION\s*=\s*(KERBEROS|SSL|NONE)/i);
+    if (authMatch) entry.authentication = authMatch[1].trim().toUpperCase();
+    
+    const certMatch = entryContent.match(/\bCERTIFICATE\s*=\s*"([^"]+)"/i);
+    if (certMatch) entry.certificate = certMatch[1].trim();
+    
+    const privateKeyMatch = entryContent.match(/\bPRIVATE_KEY\s*=\s*"([^"]+)"/i);
+    if (privateKeyMatch) entry.privateKey = privateKeyMatch[1].trim();
     
     // Only add if we have at least host and serviceName
     if (entry.host && entry.serviceName) {
@@ -192,12 +298,56 @@ function generateTnsnames(entries: TnsEntry[], groups: string[]): string {
     }
     
     content += '\n';
-    content += `${entry.alias} =\n`;
-    content += `  (DESCRIPTION =\n`;
-    content += `    (ADDRESS = (PROTOCOL = ${entry.protocol || 'TCP'})(HOST = ${entry.host})(PORT = ${entry.port || '1521'}))\n`;
-    content += `    (CONNECT_DATA =\n`;
-    content += `      (SERVICE_NAME = ${entry.serviceName})\n`;
-    content += `    )\n`;
+    content += `${entry.alias} = \n`;
+    content += `  (DESCRIPTION = \n`;
+    
+    // Description level parameters
+    if (entry.retryCount || entry.retryDelay || entry.timeout || entry.sendTimeout || 
+        entry.receiveTimeout || entry.loadBalance || entry.failover || entry.sourceRoute) {
+      if (entry.retryCount) content += `    (RETRY_COUNT=${entry.retryCount}) `;
+      if (entry.retryDelay) content += `(RETRY_DELAY=${entry.retryDelay}) `;
+      if (entry.timeout) content += `(TIMEOUT=${entry.timeout}) `;
+      if (entry.sendTimeout) content += `(SEND_TIMEOUT=${entry.sendTimeout}) `;
+      if (entry.receiveTimeout) content += `(RECEIVE_TIMEOUT=${entry.receiveTimeout}) `;
+      if (entry.loadBalance) content += `(LOAD_BALANCE=${entry.loadBalance}) `;
+      if (entry.failover) content += `(FAILOVER=${entry.failover}) `;
+      if (entry.sourceRoute) content += `(SOURCE_ROUTE=${entry.sourceRoute}) `;
+      content += '\n';
+    }
+    
+    // Address
+    content += `    (ADDRESS = (PROTOCOL = ${entry.protocol || 'TCP'})(HOST = ${entry.host})(PORT = ${entry.port || '1521'})`;
+    if (entry.ip) content += `(IP = ${entry.ip})`;
+    if (entry.localAddress) content += `(LOCAL_ADDRESS = ${entry.localAddress})`;
+    content += `)\n`;
+    
+    // Connect data
+    content += `    (CONNECT_DATA = \n`;
+    content += `      (SERVICE_NAME = ${entry.serviceName})`;
+    if (entry.sid) content += `\n      (SID = ${entry.sid})`;
+    if (entry.instanceName) content += `\n      (INSTANCE_NAME = ${entry.instanceName})`;
+    if (entry.server) content += `\n      (SERVER = ${entry.server})`;
+    if (entry.failoverType) content += `\n      (FAILOVER_TYPE = ${entry.failoverType})`;
+    if (entry.failoverRetries) content += `\n      (FAILOVER_RETRIES = ${entry.failoverRetries})`;
+    if (entry.failoverDelay) content += `\n      (FAILOVER_DELAY = ${entry.failoverDelay})`;
+    if (entry.loadBalanceTimeout) content += `\n      (LOAD_BALANCE_TIMEOUT = ${entry.loadBalanceTimeout})`;
+    if (entry.globalName) content += `\n      (GLOBAL_NAME = ${entry.globalName})`;
+    content += `\n    )\n`;
+    
+    // Security
+    if (entry.myWalletDirectory || entry.sslServerDnMatch || entry.sslServerCertDn || 
+        entry.authentication || entry.certificate || entry.privateKey) {
+      content += `    (SECURITY = `;
+      const securityParams: string[] = [];
+      if (entry.myWalletDirectory) securityParams.push(`MY_WALLET_DIRECTORY="${entry.myWalletDirectory}"`);
+      if (entry.sslServerDnMatch) securityParams.push(`SSL_SERVER_DN_MATCH=${entry.sslServerDnMatch}`);
+      if (entry.sslServerCertDn) securityParams.push(`SSL_SERVER_CERT_DN="${entry.sslServerCertDn}"`);
+      if (entry.authentication) securityParams.push(`AUTHENTICATION=${entry.authentication}`);
+      if (entry.certificate) securityParams.push(`CERTIFICATE="${entry.certificate}"`);
+      if (entry.privateKey) securityParams.push(`PRIVATE_KEY="${entry.privateKey}"`);
+      content += securityParams.join(') (') + ')\n';
+    }
+    
     content += `  )\n`;
   });
 
@@ -208,12 +358,56 @@ function generateTnsnames(entries: TnsEntry[], groups: string[]): string {
     }
     ungroupedEntries.forEach((entry) => {
       content += '\n';
-      content += `${entry.alias} =\n`;
-      content += `  (DESCRIPTION =\n`;
-      content += `    (ADDRESS = (PROTOCOL = ${entry.protocol || 'TCP'})(HOST = ${entry.host})(PORT = ${entry.port || '1521'}))\n`;
-      content += `    (CONNECT_DATA =\n`;
-      content += `      (SERVICE_NAME = ${entry.serviceName})\n`;
-      content += `    )\n`;
+      content += `${entry.alias} = \n`;
+      content += `  (DESCRIPTION = \n`;
+      
+      // Description level parameters
+      if (entry.retryCount || entry.retryDelay || entry.timeout || entry.sendTimeout || 
+          entry.receiveTimeout || entry.loadBalance || entry.failover || entry.sourceRoute) {
+        if (entry.retryCount) content += `    (RETRY_COUNT=${entry.retryCount}) `;
+        if (entry.retryDelay) content += `(RETRY_DELAY=${entry.retryDelay}) `;
+        if (entry.timeout) content += `(TIMEOUT=${entry.timeout}) `;
+        if (entry.sendTimeout) content += `(SEND_TIMEOUT=${entry.sendTimeout}) `;
+        if (entry.receiveTimeout) content += `(RECEIVE_TIMEOUT=${entry.receiveTimeout}) `;
+        if (entry.loadBalance) content += `(LOAD_BALANCE=${entry.loadBalance}) `;
+        if (entry.failover) content += `(FAILOVER=${entry.failover}) `;
+        if (entry.sourceRoute) content += `(SOURCE_ROUTE=${entry.sourceRoute}) `;
+        content += '\n';
+      }
+      
+      // Address
+      content += `    (ADDRESS = (PROTOCOL = ${entry.protocol || 'TCP'})(HOST = ${entry.host})(PORT = ${entry.port || '1521'})`;
+      if (entry.ip) content += `(IP = ${entry.ip})`;
+      if (entry.localAddress) content += `(LOCAL_ADDRESS = ${entry.localAddress})`;
+      content += `)\n`;
+      
+      // Connect data
+      content += `    (CONNECT_DATA = \n`;
+      content += `      (SERVICE_NAME = ${entry.serviceName})`;
+      if (entry.sid) content += `\n      (SID = ${entry.sid})`;
+      if (entry.instanceName) content += `\n      (INSTANCE_NAME = ${entry.instanceName})`;
+      if (entry.server) content += `\n      (SERVER = ${entry.server})`;
+      if (entry.failoverType) content += `\n      (FAILOVER_TYPE = ${entry.failoverType})`;
+      if (entry.failoverRetries) content += `\n      (FAILOVER_RETRIES = ${entry.failoverRetries})`;
+      if (entry.failoverDelay) content += `\n      (FAILOVER_DELAY = ${entry.failoverDelay})`;
+      if (entry.loadBalanceTimeout) content += `\n      (LOAD_BALANCE_TIMEOUT = ${entry.loadBalanceTimeout})`;
+      if (entry.globalName) content += `\n      (GLOBAL_NAME = ${entry.globalName})`;
+      content += `\n    )\n`;
+      
+      // Security
+      if (entry.myWalletDirectory || entry.sslServerDnMatch || entry.sslServerCertDn || 
+          entry.authentication || entry.certificate || entry.privateKey) {
+        content += `    (SECURITY = `;
+        const securityParams: string[] = [];
+        if (entry.myWalletDirectory) securityParams.push(`MY_WALLET_DIRECTORY="${entry.myWalletDirectory}"`);
+        if (entry.sslServerDnMatch) securityParams.push(`SSL_SERVER_DN_MATCH=${entry.sslServerDnMatch}`);
+        if (entry.sslServerCertDn) securityParams.push(`SSL_SERVER_CERT_DN="${entry.sslServerCertDn}"`);
+        if (entry.authentication) securityParams.push(`AUTHENTICATION=${entry.authentication}`);
+        if (entry.certificate) securityParams.push(`CERTIFICATE="${entry.certificate}"`);
+        if (entry.privateKey) securityParams.push(`PRIVATE_KEY="${entry.privateKey}"`);
+        content += securityParams.join(') (') + ')\n';
+      }
+      
       content += `  )\n`;
     });
   }
@@ -879,6 +1073,9 @@ interface EntryCardProps {
 }
 
 const EntryCard = ({ entry, onEdit, onDelete }: EntryCardProps) => {
+  const hasSecurity = entry.myWalletDirectory || entry.sslServerDnMatch;
+  const hasAdvanced = entry.retryCount || entry.retryDelay || entry.timeout;
+  
   return (
     <Card className="hover:shadow-md transition-shadow duration-200 border-slate-200">
       <CardHeader className="pb-3">
@@ -916,7 +1113,29 @@ const EntryCard = ({ entry, onEdit, onDelete }: EntryCardProps) => {
           <div className="flex items-center gap-2 text-sm">
             <Network className="w-4 h-4 text-slate-400" />
             <span className="text-slate-500">{entry.protocol || 'TCP'}</span>
+            {entry.sid && <span className="text-slate-400">/ SID:{entry.sid}</span>}
           </div>
+          
+          {/* Security indicator */}
+          {hasSecurity && (
+            <div className="flex items-center gap-2 text-sm">
+              <Shield className="w-4 h-4 text-emerald-500" />
+              <span className="text-emerald-600">SSL/TLS</span>
+              {entry.myWalletDirectory && (
+                <span className="text-xs text-slate-400 truncate">Wallet: {entry.myWalletDirectory.split('\\').pop() || entry.myWalletDirectory.split('/').pop()}</span>
+              )}
+            </div>
+          )}
+          
+          {/* Advanced options indicator */}
+          {hasAdvanced && (
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <span className="text-amber-600">Advanced</span>
+              {entry.retryCount && <span className="text-xs text-slate-400">Retry: {entry.retryCount}</span>}
+            </div>
+          )}
+          
           {entry.group && (
             <div className="flex items-center gap-2 text-sm">
               <Folder className="w-4 h-4 text-indigo-400" />
@@ -947,9 +1166,39 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
     protocol: entry?.protocol || "TCP",
     description: entry?.description || "",
     group: entry?.group || "",
+    // Advanced
+    retryCount: entry?.retryCount || "",
+    retryDelay: entry?.retryDelay || "",
+    timeout: entry?.timeout || "",
+    sendTimeout: entry?.sendTimeout || "",
+    receiveTimeout: entry?.receiveTimeout || "",
+    loadBalance: entry?.loadBalance || "",
+    failover: entry?.failover || "",
+    sourceRoute: entry?.sourceRoute || "",
+    // Address
+    ip: entry?.ip || "",
+    localAddress: entry?.localAddress || "",
+    // Connect data
+    sid: entry?.sid || "",
+    instanceName: entry?.instanceName || "",
+    server: entry?.server || "",
+    failoverType: entry?.failoverType || "",
+    failoverRetries: entry?.failoverRetries || "",
+    failoverDelay: entry?.failoverDelay || "",
+    loadBalanceTimeout: entry?.loadBalanceTimeout || "",
+    globalName: entry?.globalName || "",
+    // Security
+    myWalletDirectory: entry?.myWalletDirectory || "",
+    sslServerDnMatch: entry?.sslServerDnMatch || "",
+    sslServerCertDn: entry?.sslServerCertDn || "",
+    authentication: entry?.authentication || "",
+    certificate: entry?.certificate || "",
+    privateKey: entry?.privateKey || "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
 
   useEffect(() => {
     if (entry) {
@@ -961,6 +1210,30 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
         protocol: entry.protocol || "TCP",
         description: entry.description || "",
         group: entry.group || "",
+        retryCount: entry.retryCount || "",
+        retryDelay: entry.retryDelay || "",
+        timeout: entry.timeout || "",
+        sendTimeout: entry.sendTimeout || "",
+        receiveTimeout: entry.receiveTimeout || "",
+        loadBalance: entry.loadBalance || "",
+        failover: entry.failover || "",
+        sourceRoute: entry.sourceRoute || "",
+        ip: entry.ip || "",
+        localAddress: entry.localAddress || "",
+        sid: entry.sid || "",
+        instanceName: entry.instanceName || "",
+        server: entry.server || "",
+        failoverType: entry.failoverType || "",
+        failoverRetries: entry.failoverRetries || "",
+        failoverDelay: entry.failoverDelay || "",
+        loadBalanceTimeout: entry.loadBalanceTimeout || "",
+        globalName: entry.globalName || "",
+        myWalletDirectory: entry.myWalletDirectory || "",
+        sslServerDnMatch: entry.sslServerDnMatch || "",
+        sslServerCertDn: entry.sslServerCertDn || "",
+        authentication: entry.authentication || "",
+        certificate: entry.certificate || "",
+        privateKey: entry.privateKey || "",
       });
     }
   }, [entry]);
@@ -998,8 +1271,12 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
     }
   };
 
+  const updateField = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
   return (
-    <DialogContent className="sm:max-w-[500px]">
+    <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>
@@ -1007,12 +1284,13 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
         </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Basic Info */}
         <div className="space-y-2">
           <Label htmlFor="alias">Alias *</Label>
           <Input
             id="alias"
             value={formData.alias}
-            onChange={(e) => setFormData({ ...formData, alias: e.target.value })}
+            onChange={(e) => updateField("alias", e.target.value)}
             placeholder="e.g., ORCL, PRODDB, DEVDB"
             className={errors.alias ? "border-red-500" : ""}
           />
@@ -1025,7 +1303,7 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
             <Input
               id="host"
               value={formData.host}
-              onChange={(e) => setFormData({ ...formData, host: e.target.value })}
+              onChange={(e) => updateField("host", e.target.value)}
               placeholder="e.g., localhost"
               className={errors.host ? "border-red-500" : ""}
             />
@@ -1037,7 +1315,7 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
               id="port"
               type="number"
               value={formData.port}
-              onChange={(e) => setFormData({ ...formData, port: e.target.value })}
+              onChange={(e) => updateField("port", e.target.value)}
               placeholder="1521"
               className={errors.port ? "border-red-500" : ""}
             />
@@ -1050,33 +1328,80 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
           <Input
             id="serviceName"
             value={formData.serviceName}
-            onChange={(e) => setFormData({ ...formData, serviceName: e.target.value })}
+            onChange={(e) => updateField("serviceName", e.target.value)}
             placeholder="e.g., orcl, prod.company.com"
             className={errors.serviceName ? "border-red-500" : ""}
           />
           {errors.serviceName && <p className="text-xs text-red-500">{errors.serviceName}</p>}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="protocol">Protocol</Label>
-          <select
-            id="protocol"
-            value={formData.protocol}
-            onChange={(e) => setFormData({ ...formData, protocol: e.target.value })}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="TCP">TCP</option>
-            <option value="IPC">IPC</option>
-            <option value="TCPS">TCPS</option>
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="protocol">Protocol</Label>
+            <Select 
+              value={formData.protocol} 
+              onValueChange={(value) => updateField("protocol", value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select protocol" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TCP">TCP</SelectItem>
+                <SelectItem value="TCPS">TCPS (SSL/TLS)</SelectItem>
+                <SelectItem value="IPC">IPC</SelectItem>
+                <SelectItem value="NMP">NMP</SelectItem>
+                <SelectItem value="SPX">SPX</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="sid">SID (optional)</Label>
+            <Input
+              id="sid"
+              value={formData.sid}
+              onChange={(e) => updateField("sid", e.target.value)}
+              placeholder="e.g., ORCL"
+            />
+          </div>
         </div>
 
+        {/* Connect Data Options */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="instanceName">Instance Name</Label>
+            <Input
+              id="instanceName"
+              value={formData.instanceName}
+              onChange={(e) => updateField("instanceName", e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="server">Server Type</Label>
+            <Select 
+              value={formData.server || ""} 
+              onValueChange={(value) => updateField("server", value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Default</SelectItem>
+                <SelectItem value="DEDICATED">Dedicated</SelectItem>
+                <SelectItem value="SHARED">Shared</SelectItem>
+                <SelectItem value="POOLED">Pooled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Group */}
         <div className="space-y-2">
           <Label htmlFor="group">Group</Label>
           <Select 
             value={formData.group || "__none__"} 
             onValueChange={(value) => {
-              setFormData({ ...formData, group: value === "__none__" ? "" : value });
+              updateField("group", value === "__none__" ? "" : value);
             }}
           >
             <SelectTrigger className="w-full">
@@ -1096,10 +1421,315 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
           <Input
             id="description"
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) => updateField("description", e.target.value)}
             placeholder="Optional description"
           />
         </div>
+
+        {/* Advanced Options Toggle */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="w-full gap-2"
+        >
+          <Clock className="w-4 h-4" />
+          {showAdvanced ? "Hide" : "Show"} Advanced Options
+        </Button>
+
+        {/* Advanced Options */}
+        {showAdvanced && (
+          <div className="space-y-4 p-4 bg-slate-50 rounded-lg">
+            <h4 className="font-medium text-sm text-slate-700 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Description Level Options
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="retryCount">Retry Count</Label>
+                <Input
+                  id="retryCount"
+                  type="number"
+                  value={formData.retryCount}
+                  onChange={(e) => updateField("retryCount", e.target.value)}
+                  placeholder="e.g., 20"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="retryDelay">Retry Delay (sec)</Label>
+                <Input
+                  id="retryDelay"
+                  type="number"
+                  value={formData.retryDelay}
+                  onChange={(e) => updateField("retryDelay", e.target.value)}
+                  placeholder="e.g., 3"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="timeout">Timeout (sec)</Label>
+                <Input
+                  id="timeout"
+                  type="number"
+                  value={formData.timeout}
+                  onChange={(e) => updateField("timeout", e.target.value)}
+                  placeholder="Connection timeout"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sendTimeout">Send Timeout (sec)</Label>
+                <Input
+                  id="sendTimeout"
+                  type="number"
+                  value={formData.sendTimeout}
+                  onChange={(e) => updateField("sendTimeout", e.target.value)}
+                  placeholder="Send timeout"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receiveTimeout">Receive Timeout (sec)</Label>
+                <Input
+                  id="receiveTimeout"
+                  type="number"
+                  value={formData.receiveTimeout}
+                  onChange={(e) => updateField("receiveTimeout", e.target.value)}
+                  placeholder="Receive timeout"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="loadBalanceTimeout">Load Balance Timeout</Label>
+                <Input
+                  id="loadBalanceTimeout"
+                  type="number"
+                  value={formData.loadBalanceTimeout}
+                  onChange={(e) => updateField("loadBalanceTimeout", e.target.value)}
+                  placeholder="LB timeout"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Load Balance</Label>
+                <Select 
+                  value={formData.loadBalance || ""} 
+                  onValueChange={(value) => updateField("loadBalance", value)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Default</SelectItem>
+                    <SelectItem value="ON">ON</SelectItem>
+                    <SelectItem value="OFF">OFF</SelectItem>
+                    <SelectItem value="YES">YES</SelectItem>
+                    <SelectItem value="NO">NO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Failover</Label>
+                <Select 
+                  value={formData.failover || ""} 
+                  onValueChange={(value) => updateField("failover", value)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Default</SelectItem>
+                    <SelectItem value="ON">ON</SelectItem>
+                    <SelectItem value="OFF">OFF</SelectItem>
+                    <SelectItem value="YES">YES</SelectItem>
+                    <SelectItem value="NO">NO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Source Route</Label>
+                <Select 
+                  value={formData.sourceRoute || ""} 
+                  onValueChange={(value) => updateField("sourceRoute", value)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Default</SelectItem>
+                    <SelectItem value="ON">ON</SelectItem>
+                    <SelectItem value="OFF">OFF</SelectItem>
+                    <SelectItem value="YES">YES</SelectItem>
+                    <SelectItem value="NO">NO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <h4 className="font-medium text-sm text-slate-700 flex items-center gap-2 pt-2">
+              <Key className="w-4 h-4" />
+              Failover Options
+            </h4>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="failoverType">Failover Type</Label>
+                <Select 
+                  value={formData.failoverType || ""} 
+                  onValueChange={(value) => updateField("failoverType", value)}
+                >
+                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="SESSION">Session</SelectItem>
+                    <SelectItem value="SELECT">Select</SelectItem>
+                    <SelectItem value="NONE">None</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="failoverRetries">Failover Retries</Label>
+                <Input
+                  id="failoverRetries"
+                  type="number"
+                  value={formData.failoverRetries}
+                  onChange={(e) => updateField("failoverRetries", e.target.value)}
+                  placeholder="e.g., 10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="failoverDelay">Failover Delay</Label>
+                <Input
+                  id="failoverDelay"
+                  type="number"
+                  value={formData.failoverDelay}
+                  onChange={(e) => updateField("failoverDelay", e.target.value)}
+                  placeholder="e.g., 1"
+                />
+              </div>
+            </div>
+
+            <h4 className="font-medium text-sm text-slate-700 flex items-center gap-2 pt-2">
+              <Network className="w-4 h-4" />
+              Address Options
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ip">IP Address</Label>
+                <Input
+                  id="ip"
+                  value={formData.ip}
+                  onChange={(e) => updateField("ip", e.target.value)}
+                  placeholder="e.g., 192.168.1.1"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="localAddress">Local Address</Label>
+                <Input
+                  id="localAddress"
+                  value={formData.localAddress}
+                  onChange={(e) => updateField("localAddress", e.target.value)}
+                  placeholder="Local address"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="globalName">Global Name</Label>
+              <Input
+                id="globalName"
+                value={formData.globalName}
+                onChange={(e) => updateField("globalName", e.target.value)}
+                placeholder="e.g., mydb.world"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Security Options Toggle */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowSecurity(!showSecurity)}
+          className="w-full gap-2"
+        >
+          <Shield className="w-4 h-4" />
+          {showSecurity ? "Hide" : "Show"} Security / SSL Options
+        </Button>
+
+        {/* Security Options */}
+        {showSecurity && (
+          <div className="space-y-4 p-4 bg-emerald-50 rounded-lg">
+            <h4 className="font-medium text-sm text-emerald-800 flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              SSL / TLS Security Options
+            </h4>
+            
+            <div className="space-y-2">
+              <Label htmlFor="myWalletDirectory">Wallet Directory (MY_WALLET_DIRECTORY)</Label>
+              <Input
+                id="myWalletDirectory"
+                value={formData.myWalletDirectory}
+                onChange={(e) => updateField("myWalletDirectory", e.target.value)}
+                placeholder='e.g., C:\oracle\wallet\Wallet_MyDB'
+              />
+              <p className="text-xs text-slate-500">Path to Oracle Wallet directory for SSL authentication</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>SSL Server DN Match</Label>
+              <Select 
+                value={formData.sslServerDnMatch || ""} 
+                onValueChange={(value) => updateField("sslServerDnMatch", value)}
+              >
+                <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Default</SelectItem>
+                  <SelectItem value="YES">YES</SelectItem>
+                  <SelectItem value="NO">NO</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500">Verify SSL server certificate Distinguished Name</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sslServerCertDn">SSL Server Certificate DN</Label>
+              <Input
+                id="sslServerCertDn"
+                value={formData.sslServerCertDn}
+                onChange={(e) => updateField("sslServerCertDn", e.target.value)}
+                placeholder='e.g., CN=oracle.example.com,O=Example Inc,C=US'
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Authentication Method</Label>
+              <Select 
+                value={formData.authentication || ""} 
+                onValueChange={(value) => updateField("authentication", value)}
+              >
+                <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Default</SelectItem>
+                  <SelectItem value="NONE">None</SelectItem>
+                  <SelectItem value="KERBEROS">Kerberos</SelectItem>
+                  <SelectItem value="SSL">SSL</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="certificate">Certificate (for SSL)</Label>
+              <Input
+                id="certificate"
+                value={formData.certificate}
+                onChange={(e) => updateField("certificate", e.target.value)}
+                placeholder="Certificate file path"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="privateKey">Private Key (for SSL)</Label>
+              <Input
+                id="privateKey"
+                value={formData.privateKey}
+                onChange={(e) => updateField("privateKey", e.target.value)}
+                placeholder="Private key file path"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-4">
           {onCancel && (
