@@ -589,7 +589,7 @@ const GroupManagementDialog = ({ groups, entries, onAddGroup, onDeleteGroup, onR
                   </>
                 ) : (
                   <>
-                    <Folder className="w-4 h-4 text-indigo-500" />
+                    <Folder className="w-4 h-4 text-red-500" />
                     <span className="flex-1 font-medium">{group}</span>
                     <span className="text-xs text-slate-400">({getEntryCount(group)} entries)</span>
                     <Button size="sm" variant="ghost" onClick={() => handleStartEdit(group)}>
@@ -835,7 +835,7 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center shadow-lg">
                 <Database className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -844,7 +844,7 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                 {entries.length} {entries.length === 1 ? 'Entry' : 'Entries'}
               </Badge>
               <span className="text-xs text-slate-400">v{APP_VERSION}</span>
@@ -872,7 +872,7 @@ const Index = () => {
           
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
+              <Button className="gap-2 bg-red-600 hover:bg-red-700">
                 <Plus className="w-4 h-4" />
                 Add Entry
               </Button>
@@ -925,7 +925,7 @@ const Index = () => {
             </Select>
           </div>
 
-          <Button onClick={handleExportTnsnames} disabled={entries.length === 0} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+          <Button onClick={handleExportTnsnames} disabled={entries.length === 0} className="gap-2 bg-red-600 hover:bg-red-700">
             <Save className="w-4 h-4" />
             Export .ora
           </Button>
@@ -960,7 +960,7 @@ const Index = () => {
                     <Button variant="outline" onClick={() => setActiveTab("raw")}>
                       Paste Content
                     </Button>
-                    <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+                    <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 bg-red-600 hover:bg-red-700">
                       <Plus className="w-4 h-4" />
                       Add Entry
                     </Button>
@@ -1001,7 +1001,7 @@ const Index = () => {
                     {Array.from(groupedEntries.entries()).map(([group, groupEntries]) => (
                       <div key={group}>
                         <div className="flex items-center gap-2 mb-3">
-                          <Badge variant="secondary" className="text-sm px-3 py-1 bg-indigo-100 text-indigo-700 border-indigo-200">
+                          <Badge variant="secondary" className="text-sm px-3 py-1 bg-red-100 text-red-700 border-red-200">
                             <Folder className="w-3 h-3 mr-1" />
                             {group}
                           </Badge>
@@ -1066,7 +1066,7 @@ const Index = () => {
                 <Button 
                   onClick={handleParseContent} 
                   disabled={isLoading || !rawContent.trim()}
-                  className="mt-4 gap-2"
+                  className="mt-4 gap-2 bg-red-600 hover:bg-red-700"
                 >
                   {isLoading ? "Parsing..." : "Parse Content"}
                 </Button>
@@ -1149,8 +1149,8 @@ const EntryCard = ({ entry, onEdit, onDelete }: EntryCardProps) => {
           {/* Security indicator */}
           {hasSecurity && (
             <div className="flex items-center gap-2 text-sm">
-              <Shield className="w-4 h-4 text-emerald-500" />
-              <span className="text-emerald-600">SSL/TLS</span>
+              <Shield className="w-4 h-4 text-red-500" />
+              <span className="text-red-600">SSL/TLS</span>
               {entry.myWalletDirectory && (
                 <span className="text-xs text-slate-400 truncate">Wallet: {entry.myWalletDirectory.split('\\').pop() || entry.myWalletDirectory.split('/').pop()}</span>
               )}
@@ -1160,16 +1160,16 @@ const EntryCard = ({ entry, onEdit, onDelete }: EntryCardProps) => {
           {/* Advanced options indicator */}
           {hasAdvanced && (
             <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 text-amber-500" />
-              <span className="text-amber-600">Advanced</span>
+              <Clock className="w-4 h-4 text-red-500" />
+              <span className="text-red-600">Advanced</span>
               {entry.retryCount && <span className="text-xs text-slate-400">Retry: {entry.retryCount}</span>}
             </div>
           )}
           
           {entry.group && (
             <div className="flex items-center gap-2 text-sm">
-              <Folder className="w-4 h-4 text-indigo-400" />
-              <span className="text-indigo-600">{entry.group}</span>
+              <Folder className="w-4 h-4 text-red-400" />
+              <span className="text-red-600">{entry.group}</span>
             </div>
           )}
         </div>
@@ -1685,8 +1685,8 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
 
         {/* Security Options */}
         {showSecurity && (
-          <div className="space-y-4 p-4 bg-emerald-50 rounded-lg">
-            <h4 className="font-medium text-sm text-emerald-800 flex items-center gap-2">
+          <div className="space-y-4 p-4 bg-red-50 rounded-lg">
+            <h4 className="font-medium text-sm text-red-800 flex items-center gap-2">
               <Shield className="w-4 h-4" />
               SSL / TLS Security Options
             </h4>
@@ -1772,7 +1772,7 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
               Cancel
             </Button>
           )}
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+          <Button type="submit" className="bg-red-600 hover:bg-red-700">
             {entry ? "Update" : "Add"} Connection
           </Button>
         </div>
