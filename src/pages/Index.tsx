@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast";
 
 const APP_VERSION = "1.0.0";
@@ -108,7 +107,7 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
   const allContent = processedLines.map(p => p.line).join('\n');
   
   // Find all alias = patterns
-  const aliasRegex = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\()?/gm;
+  const aliasRegex = /^([A--Za-z_][A-Za-z0-9_]*)\s*=\s*(\()?/gm;
   
   let match;
   while ((match = aliasRegex.exec(allContent)) !== null) {
@@ -177,7 +176,7 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
     const receiveTimeoutMatch = entryContent.match(/\bRECEIVE_TIMEOUT\s*=\s*(\d+)/i);
     if (receiveTimeoutMatch) entry.receiveTimeout = receiveTimeoutMatch[1].trim();
     
-    const loadBalanceMatch = entryContent.match(/\bLOAD_BALANCE\s*=\s*(on|off|yes|no)/i);
+    const loadBalanceMatch = entryContent.match(/\bLOAD_ BALANCE\s*=\s*(on|off|yes|no)/i);
     if (loadBalanceMatch) entry.loadBalance = loadBalanceMatch[1].trim().toUpperCase();
     
     const failoverMatch = entryContent.match(/\bFAILOVER\s*=\s*(on|off|yes|no)/i);
@@ -322,7 +321,7 @@ function generateTnsnames(entries: TnsEntry[], groups: string[]): string {
     content += `)\n`;
     
     // Connect data
-    content += `    (CONNECT_DATA = \n`;
+    content += `    (CONNECT_ DATA = \n`;
     content += `      (SERVICE_NAME = ${entry.serviceName})`;
     if (entry.sid) content += `\n      (SID = ${entry.sid})`;
     if (entry.instanceName) content += `\n      (INSTANCE_NAME = ${entry.instanceName})`;
@@ -916,7 +915,7 @@ const Index = () => {
 
           <TabsContent value="entries">
             {entries.length === 0 ? (
-              <Card className="border-dashed border-2 border-slate-300">
+              <Card className="border-2 border-dashed border-slate-300">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                     <Database className="w-8 h-8 text-slate-400" />
@@ -1120,7 +1119,7 @@ const EntryCard = ({ entry, onEdit, onDelete }: EntryCardProps) => {
           {hasSecurity && (
             <div className="flex items-center gap-2 text-sm">
               <Shield className="w-4 h-4 text-emerald-500" />
-              <span className="text-emerald-600">SSL/TLS</span>
+              <span className="text-emerald-600">SSL/TSL</span>
               {entry.myWalletDirectory && (
                 <span className="text-xs text-slate-400 truncate">Wallet: {entry.myWalletDirectory.split('\\').pop() || entry.myWalletDirectory.split('/').pop()}</span>
               )}
@@ -1275,6 +1274,11 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Helper to handle Select value changes - converts placeholder to empty string
+  const handleSelectChange = (field: keyof typeof formData, value: string) => {
+    updateField(field, value === "__default__" ? "" : value);
+  };
+
   return (
     <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
@@ -1347,7 +1351,7 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="TCP">TCP</SelectItem>
-                <SelectItem value="TCPS">TCPS (SSL/TLS)</SelectItem>
+                <SelectItem value="TCPS">TCPS (SSL/TSL)</SelectItem>
                 <SelectItem value="IPC">IPC</SelectItem>
                 <SelectItem value="NMP">NMP</SelectItem>
                 <SelectItem value="SPX">SPX</SelectItem>
@@ -1379,14 +1383,14 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
           <div className="space-y-2">
             <Label htmlFor="server">Server Type</Label>
             <Select 
-              value={formData.server || ""} 
-              onValueChange={(value) => updateField("server", value)}
+              value={formData.server || "__default__"} 
+              onValueChange={(value) => handleSelectChange("server", value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Default" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Default</SelectItem>
+                <SelectItem value="__default__">Default</SelectItem>
                 <SelectItem value="DEDICATED">Dedicated</SelectItem>
                 <SelectItem value="SHARED">Shared</SelectItem>
                 <SelectItem value="POOLED">Pooled</SelectItem>
@@ -1511,12 +1515,12 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
               <div className="space-y-2">
                 <Label>Load Balance</Label>
                 <Select 
-                  value={formData.loadBalance || ""} 
-                  onValueChange={(value) => updateField("loadBalance", value)}
+                  value={formData.loadBalance || "__default__"} 
+                  onValueChange={(value) => handleSelectChange("loadBalance", value)}
                 >
                   <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Default</SelectItem>
+                    <SelectItem value="__default__">Default</SelectItem>
                     <SelectItem value="ON">ON</SelectItem>
                     <SelectItem value="OFF">OFF</SelectItem>
                     <SelectItem value="YES">YES</SelectItem>
@@ -1527,12 +1531,12 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
               <div className="space-y-2">
                 <Label>Failover</Label>
                 <Select 
-                  value={formData.failover || ""} 
-                  onValueChange={(value) => updateField("failover", value)}
+                  value={formData.failover || "__default__"} 
+                  onValueChange={(value) => handleSelectChange("failover", value)}
                 >
                   <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Default</SelectItem>
+                    <SelectItem value="__default__">Default</SelectItem>
                     <SelectItem value="ON">ON</SelectItem>
                     <SelectItem value="OFF">OFF</SelectItem>
                     <SelectItem value="YES">YES</SelectItem>
@@ -1543,12 +1547,12 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
               <div className="space-y-2">
                 <Label>Source Route</Label>
                 <Select 
-                  value={formData.sourceRoute || ""} 
-                  onValueChange={(value) => updateField("sourceRoute", value)}
+                  value={formData.sourceRoute || "__default__"} 
+                  onValueChange={(value) => handleSelectChange("sourceRoute", value)}
                 >
                   <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Default</SelectItem>
+                    <SelectItem value="__default__">Default</SelectItem>
                     <SelectItem value="ON">ON</SelectItem>
                     <SelectItem value="OFF">OFF</SelectItem>
                     <SelectItem value="YES">YES</SelectItem>
@@ -1566,12 +1570,12 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
               <div className="space-y-2">
                 <Label htmlFor="failoverType">Failover Type</Label>
                 <Select 
-                  value={formData.failoverType || ""} 
-                  onValueChange={(value) => updateField("failoverType", value)}
+                  value={formData.failoverType || "__default__"} 
+                  onValueChange={(value) => handleSelectChange("failoverType", value)}
                 >
                   <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="__default__">None</SelectItem>
                     <SelectItem value="SESSION">Session</SelectItem>
                     <SelectItem value="SELECT">Select</SelectItem>
                     <SelectItem value="NONE">None</SelectItem>
@@ -1670,12 +1674,12 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
             <div className="space-y-2">
               <Label>SSL Server DN Match</Label>
               <Select 
-                value={formData.sslServerDnMatch || ""} 
-                onValueChange={(value) => updateField("sslServerDnMatch", value)}
+                value={formData.sslServerDnMatch || "__default__"} 
+                onValueChange={(value) => handleSelectChange("sslServerDnMatch", value)}
               >
                 <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Default</SelectItem>
+                  <SelectItem value="__default__">Default</SelectItem>
                   <SelectItem value="YES">YES</SelectItem>
                   <SelectItem value="NO">NO</SelectItem>
                 </SelectContent>
@@ -1696,12 +1700,12 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
             <div className="space-y-2">
               <Label>Authentication Method</Label>
               <Select 
-                value={formData.authentication || ""} 
-                onValueChange={(value) => updateField("authentication", value)}
+                value={formData.authentication || "__default__"} 
+                onValueChange={(value) => handleSelectChange("authentication", value)}
               >
                 <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Default</SelectItem>
+                  <SelectItem value="__default__">Default</SelectItem>
                   <SelectItem value="NONE">None</SelectItem>
                   <SelectItem value="KERBEROS">Kerberos</SelectItem>
                   <SelectItem value="SSL">SSL</SelectItem>
