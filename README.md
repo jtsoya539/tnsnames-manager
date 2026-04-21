@@ -10,6 +10,8 @@ A modern, user-friendly web application for managing Oracle Database TNS (Transp
 - **Multiple Export Formats**: Export your configurations as `tnsnames.ora`, JSON, or YAML
 - **Search & Filter**: Quickly find connections by alias, host, service name, or group
 - **Alphabetical Sorting**: Sort entries alphabetically for easy navigation
+- **Advanced Options**: Configure retry counts, timeouts, load balancing, failover settings
+- **SSL/TLS Support**: Configure Oracle Wallet and SSL server certificate settings
 
 ## Getting Started
 
@@ -17,13 +19,6 @@ A modern, user-friendly web application for managing Oracle Database TNS (Transp
 2. Add, edit, or delete connection entries
 3. Organize connections into groups
 4. Export your configuration in your preferred format
-
-## Tech Stack
-
-- React + TypeScript
-- Tailwind CSS
-- shadcn/ui components
-- Vite
 
 ## Usage
 
@@ -54,10 +49,47 @@ DEV_DB =
 ### Supported Formats
 
 The parser handles various tnsnames.ora formats including:
-- Standard Oracle TNS format
+- Standard Oracle TNS format (multi-line)
+- Compact single-line format
 - Entries with or without opening parenthesis on alias line
 - Arbitrary comments (ignored during parsing)
 - Custom group definitions
+
+### Advanced Configuration
+
+The app supports comprehensive Oracle TNS configuration options:
+
+**Description Level:**
+- Retry Count & Delay
+- Connection Timeouts (send/receive)
+- Load Balancing
+- Failover settings
+- Source Route
+
+**Address Level:**
+- Protocol (TCP, TCPS, IPC, NMP, SPX)
+- IP Address
+- Local Address
+
+**Connect Data Level:**
+- Service Name / SID
+- Instance Name
+- Server Type (Dedicated, Shared, Pooled)
+- Failover Type (Session, Select)
+- Global Name
+
+**Security Level:**
+- Oracle Wallet Directory
+- SSL Server DN Match
+- SSL Server Certificate DN
+- Authentication Methods (Kerberos, SSL)
+
+## Tech Stack
+
+- React + TypeScript
+- Tailwind CSS
+- shadcn/ui components
+- Vite
 
 ---
 
