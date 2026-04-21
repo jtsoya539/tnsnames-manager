@@ -106,8 +106,8 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
   // Join all content into one string for easier regex matching
   const allContent = processedLines.map(p => p.line).join('\n');
   
-  // Find all alias = patterns
-  const aliasRegex = /^([A--Za-z_][A-Za-z0-9_]*)\s*=\s*(\()?/gm;
+  // Find all alias = patterns - fixed regex character class
+  const aliasRegex = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\()?/gm;
   
   let match;
   while ((match = aliasRegex.exec(allContent)) !== null) {
@@ -164,16 +164,16 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
     const retryCountMatch = entryContent.match(/\bRETRY_COUNT\s*=\s*(\d+)/i);
     if (retryCountMatch) entry.retryCount = retryCountMatch[1].trim();
     
-    const retryDelayMatch = entryContent.match(/\bRETRY_DELAY\s*=\s*(\d+)/i);
+    const retryDelayMatch = entryContent.match(/\bRETRY_ DELAY\s*=\s*(\d+)/i);
     if (retryDelayMatch) entry.retryDelay = retryDelayMatch[1].trim();
     
     const timeoutMatch = entryContent.match(/\bTIMEOUT\s*=\s*(\d+)/i);
     if (timeoutMatch) entry.timeout = timeoutMatch[1].trim();
     
-    const sendTimeoutMatch = entryContent.match(/\bSEND_TIMEOUT\s*=\s*(\d+)/i);
+    const sendTimeoutMatch = entryContent.match(/\bSEND_ TIMEOUT\s*=\s*(\d+)/i);
     if (sendTimeoutMatch) entry.sendTimeout = sendTimeoutMatch[1].trim();
     
-    const receiveTimeoutMatch = entryContent.match(/\bRECEIVE_TIMEOUT\s*=\s*(\d+)/i);
+    const receiveTimeoutMatch = entryContent.match(/\bRECEIVE_ TIMEOUT\s*=\s*(\d+)/i);
     if (receiveTimeoutMatch) entry.receiveTimeout = receiveTimeoutMatch[1].trim();
     
     const loadBalanceMatch = entryContent.match(/\bLOAD_ BALANCE\s*=\s*(on|off|yes|no)/i);
@@ -182,7 +182,7 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
     const failoverMatch = entryContent.match(/\bFAILOVER\s*=\s*(on|off|yes|no)/i);
     if (failoverMatch) entry.failover = failoverMatch[1].trim().toUpperCase();
     
-    const sourceRouteMatch = entryContent.match(/\bSOURCE_ROUTE\s*=\s*(on|off|yes|no)/i);
+    const sourceRouteMatch = entryContent.match(/\bSOURCE_ ROUTE\s*=\s*(on|off|yes|no)/i);
     if (sourceRouteMatch) entry.sourceRoute = sourceRouteMatch[1].trim().toUpperCase();
     
     // Extract ADDRESS level parameters
@@ -198,49 +198,49 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
     const ipMatch = entryContent.match(/\bIP\s*=\s*([^\s)]+)/i);
     if (ipMatch) entry.ip = ipMatch[1].trim();
     
-    const localAddressMatch = entryContent.match(/\bLOCAL_ADDRESS\s*=\s*([^\s)]+)/i);
+    const localAddressMatch = entryContent.match(/\bLOCAL_ ADDRESS\s*=\s*([^\s)]+)/i);
     if (localAddressMatch) entry.localAddress = localAddressMatch[1].trim();
     
-    // Extract CONNECT_DATA level parameters
-    const serviceNameMatch = entryContent.match(/\bSERVICE_NAME\s*=\s*([^\s)]+)/i) || 
-                             entryContent.match(/\bSERVICE_NAME\s*=\s*\(([^)]+)\)/i);
+    // Extract CONNECT_ DATA level parameters
+    const serviceNameMatch = entryContent.match(/\bSERVICE_ NAME\s*=\s*([^\s)]+)/i) || 
+                             entryContent.match(/\bSERVICE_ NAME\s*=\s*\(([^)]+)\)/i);
     if (serviceNameMatch) entry.serviceName = (serviceNameMatch[1] || serviceNameMatch[0].split('=')[1]).trim();
     
     const sidMatch = entryContent.match(/\bSID\s*=\s*([^\s)]+)/i);
     if (sidMatch) entry.sid = sidMatch[1].trim();
     
-    const instanceNameMatch = entryContent.match(/\bINSTANCE_NAME\s*=\s*([^\s)]+)/i);
+    const instanceNameMatch = entryContent.match(/\bINSTANCE_ NAME\s*=\s*([^\s)]+)/i);
     if (instanceNameMatch) entry.instanceName = instanceNameMatch[1].trim();
     
     const serverMatch = entryContent.match(/\bSERVER\s*=\s*(DEDICATED|POOLED|SHARED)/i);
     if (serverMatch) entry.server = serverMatch[1].trim().toUpperCase();
     
-    const failoverModeMatch = entryContent.match(/\bFAILOVER_MODE\s*=\s*\(([^)]+)\)/i);
+    const failoverModeMatch = entryContent.match(/\bFAILOVER_ MODE\s*=\s*\(([^)]+)\)/i);
     if (failoverModeMatch) entry.failoverMode = failoverModeMatch[1].trim();
     
-    const failoverTypeMatch = entryContent.match(/\bFAILOVER_TYPE\s*=\s*(SESSION|SELECT|NONE)/i);
+    const failoverTypeMatch = entryContent.match(/\bFAILOVER_ TYPE\s*=\s*(SESSION|SELECT|NONE)/i);
     if (failoverTypeMatch) entry.failoverType = failoverTypeMatch[1].trim().toUpperCase();
     
-    const failoverRetriesMatch = entryContent.match(/\bFAILOVER_RETRIES\s*=\s*(\d+)/i);
+    const failoverRetriesMatch = entryContent.match(/\bFAILOVER_ RETRIES\s*=\s*(\d+)/i);
     if (failoverRetriesMatch) entry.failoverRetries = failoverRetriesMatch[1].trim();
     
-    const failoverDelayMatch = entryContent.match(/\bFAILOVER_DELAY\s*=\s*(\d+)/i);
+    const failoverDelayMatch = entryContent.match(/\bFAILOVER_ DELAY\s*=\s*(\d+)/i);
     if (failoverDelayMatch) entry.failoverDelay = failoverDelayMatch[1].trim();
     
-    const loadBalanceTimeoutMatch = entryContent.match(/\bLOAD_BALANCE_TIMEOUT\s*=\s*(\d+)/i);
+    const loadBalanceTimeoutMatch = entryContent.match(/\bLOAD_ BALANCE_ TIMEOUT\s*=\s*(\d+)/i);
     if (loadBalanceTimeoutMatch) entry.loadBalanceTimeout = loadBalanceTimeoutMatch[1].trim();
     
-    const globalNameMatch = entryContent.match(/\bGLOBAL_NAME\s*=\s*([^\s)]+)/i);
+    const globalNameMatch = entryContent.match(/\bGLOBAL_ NAME\s*=\s*([^\s)]+)/i);
     if (globalNameMatch) entry.globalName = globalNameMatch[1].trim();
     
     // Extract SECURITY level parameters
-    const walletDirMatch = entryContent.match(/MY_WALLET_DIRECTORY\s*=\s*"([^"]+)"/i);
+    const walletDirMatch = entryContent.match(/MY_ WALLET_ DIRECTORY\s*=\s*"([^"]+)"/i);
     if (walletDirMatch) entry.myWalletDirectory = walletDirMatch[1].trim();
     
-    const sslDnMatchMatch = entryContent.match(/SSL_SERVER_DN_MATCH\s*=\s*(yes|no)/i);
+    const sslDnMatchMatch = entryContent.match(/SSL_ SERVER_ DN_ MATCH\s*=\s*(yes|no)/i);
     if (sslDnMatchMatch) entry.sslServerDnMatch = sslDnMatchMatch[1].trim().toUpperCase();
     
-    const sslCertDnMatch = entryContent.match(/SSL_SERVER_CERT_DN\s*=\s*"([^"]+)"/i);
+    const sslCertDnMatch = entryContent.match(/SSL_ SERVER_ CERT_ DN\s*=\s*"([^"]+)"/i);
     if (sslCertDnMatch) entry.sslServerCertDn = sslCertDnMatch[1].trim();
     
     const authMatch = entryContent.match(/\bAUTHENTICATION\s*=\s*(KERBEROS|SSL|NONE)/i);
@@ -249,7 +249,7 @@ function parseTnsnames(content: string): { entries: TnsEntry[]; groups: string[]
     const certMatch = entryContent.match(/\bCERTIFICATE\s*=\s*"([^"]+)"/i);
     if (certMatch) entry.certificate = certMatch[1].trim();
     
-    const privateKeyMatch = entryContent.match(/\bPRIVATE_KEY\s*=\s*"([^"]+)"/i);
+    const privateKeyMatch = entryContent.match(/\bPRIVATE_ KEY\s*=\s*"([^"]+)"/i);
     if (privateKeyMatch) entry.privateKey = privateKeyMatch[1].trim();
     
     // Only add if we have at least host and serviceName
@@ -321,7 +321,7 @@ function generateTnsnames(entries: TnsEntry[], groups: string[]): string {
     content += `)\n`;
     
     // Connect data
-    content += `    (CONNECT_ DATA = \n`;
+    content += `    (CONNECT_DATA = \n`;
     content += `      (SERVICE_NAME = ${entry.serviceName})`;
     if (entry.sid) content += `\n      (SID = ${entry.sid})`;
     if (entry.instanceName) content += `\n      (INSTANCE_NAME = ${entry.instanceName})`;
@@ -1119,7 +1119,7 @@ const EntryCard = ({ entry, onEdit, onDelete }: EntryCardProps) => {
           {hasSecurity && (
             <div className="flex items-center gap-2 text-sm">
               <Shield className="w-4 h-4 text-emerald-500" />
-              <span className="text-emerald-600">SSL/TSL</span>
+              <span className="text-emerald-600">SSL/TLS</span>
               {entry.myWalletDirectory && (
                 <span className="text-xs text-slate-400 truncate">Wallet: {entry.myWalletDirectory.split('\\').pop() || entry.myWalletDirectory.split('/').pop()}</span>
               )}
@@ -1351,7 +1351,7 @@ const EntryFormDialog = ({ title, entry, groups, onSubmit, onCancel }: EntryForm
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="TCP">TCP</SelectItem>
-                <SelectItem value="TCPS">TCPS (SSL/TSL)</SelectItem>
+                <SelectItem value="TCPS">TCPS (SSL/TLS)</SelectItem>
                 <SelectItem value="IPC">IPC</SelectItem>
                 <SelectItem value="NMP">NMP</SelectItem>
                 <SelectItem value="SPX">SPX</SelectItem>
